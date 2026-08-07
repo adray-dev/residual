@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+from engine.prototypes import GROUND_FLOOR_ACTIVE_PROTOTYPES
 from engine.types import (
     Assumptions,
     Envelope,
@@ -42,8 +43,23 @@ def fit_program(
 
     # Required ground-floor active use (v1.3): the ground floorplate is costed at normal
     # hard $/SF but excluded from net rentable — cost without revenue.
+    #
+    # v1.3.2: the mandate applies only to prototypes that plausibly have a non-residential
+    # ground floor (§5 `GROUND_FLOOR_ACTIVE_PROTOTYPES` = midrise/highrise). Townhome and
+    # garden are exempt: a rowhouse has no ground-floor retail, and charging it one removed
+    # a third of its revenue while keeping all of its cost.
+    #
+    # KNOWN v1 SIMPLIFICATION (SPEC §11): the mandate is still applied district-wide. The ZR
+    # ties active frontage to DESIGNATED STREET SEGMENTS (e.g. Subtitle I § 601), not to
+    # whole zones, and we have no street-segment data. So this still overstates the mandate
+    # — but now only for mid/high-rise on non-designated frontage inside mandated districts,
+    # rather than for every building type on every parcel of those districts.
     required_active_sf = 0.0
-    if rules.requires_ground_floor_active and floors >= 1:
+    if (
+        rules.requires_ground_floor_active
+        and prototype.prototype_id in GROUND_FLOOR_ACTIVE_PROTOTYPES
+        and floors >= 1
+    ):
         required_active_sf = min(envelope.max_footprint_sf, gross_sf)
         residential_gsf = max(gross_sf - required_active_sf, 0.0)
     else:

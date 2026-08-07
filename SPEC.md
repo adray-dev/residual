@@ -76,6 +76,17 @@ moving on. Build Stage A first and prove it with `pytest` before touching data.
 > - Migration: the two columns are added empty; `rlv_per_buildable_sf` cannot be backfilled,
 >   so an existing database is repopulated by re-running the bake (see `data/schema.sql`).
 
+> **Revision v1.3.2 — ground-floor active-use mandate scoped to the prototypes it can apply to.**
+> `fit_program` took the mandate carve-out for EVERY prototype in a district flagged
+> `requires_ground_floor_active`, i.e. it modelled mandatory ground-floor retail in a
+> rowhouse — removing one of three floors from revenue while costing all three. Measured
+> effect: ≈ −108 $/SF on townhome, in every district, which was the whole reason MU-/D-
+> parcels read negative while R-/RF- parcels read positive. Forcing the flag ON in RF-1 and
+> R-2 reproduced the same −46 $/SF, confirming the split tracked the flag and not economics.
+> The carve-out is now gated on `§5 GROUND_FLOOR_ACTIVE_PROTOTYPES = {midrise, highrise}`
+> as well as on the district. The district-wide-vs-street-segment overstatement remains, is
+> narrowed to mid/high-rise inside mandated districts, and is recorded in §11.
+
 ---
 
 ## 0. Product in one paragraph
@@ -468,8 +479,13 @@ def fit_program(envelope, prototype, rules, requested_use, assumptions, parcel, 
     # Required ground-floor active use (v1.3): where the district mandates it, the ground
     # floor is built (costed at normal hard $/SF) but produces NO residential rent — it is
     # excluded from net rentable. Cost-without-revenue is the economic penalty of the mandate.
+    # v1.3.2: gated on the prototype as well as the district — only building types that
+    # plausibly have a commercial ground floor (§5 GROUND_FLOOR_ACTIVE_PROTOTYPES =
+    # midrise/highrise) take the carve-out. Townhome and garden never do.
     required_active_sf = 0.0
-    if rules.requires_ground_floor_active and floors >= 1:
+    if (rules.requires_ground_floor_active
+            and prototype.prototype_id in GROUND_FLOOR_ACTIVE_PROTOTYPES
+            and floors >= 1):
         required_active_sf = min(envelope.max_footprint_sf, gross_sf)  # one floorplate
         # only the floors above the ground floor generate residential rentable SF
         residential_gsf = max(gross_sf - required_active_sf, 0.0)
@@ -620,6 +636,17 @@ Four prototypes, all rental. `min_stories` is the admissibility gate against the
 | garden | wood_v | 2–4 | 15,000 | 0.85 | surface | 20/50/30 | 500/750/1050 | $210 |
 | midrise | concrete_i | 5–12 | 8,000 | 0.80 | podium | 25/50/25 | 500/750/1050 | $340 |
 | highrise | concrete_i | 12–30 | 12,000 | 0.75 | structured | 30/50/20 | 480/720/1000 | $430 |
+
+**Ground-floor active use is a prototype property too (v1.3.2).**
+`GROUND_FLOOR_ACTIVE_PROTOTYPES = {midrise, highrise}` — the only building types that
+plausibly carry a non-residential ground floor. `zoning_rules.requires_ground_floor_active`
+says the *district* mandates active frontage; this set says which prototypes the carve-out
+can physically apply to. `fit_program` requires BOTH. Townhome and garden are exempt: a
+rowhouse has no ground-floor retail, and charging it one removed a third of its revenue
+(one of three floors) while keeping all of its cost — which was, on its own, enough to drive
+every parcel in a mandated district negative. Membership is stated explicitly, not derived
+from `construction_type`: CONCRETE_I selects exactly {midrise, highrise} today, but that is a
+coincidence of this table, and a future podium midrise would break the derivation silently.
 
 Note: 5-over-1 (`podium` construction) can be added as a 5th prototype later; v1 starts with these four.
 Hard $/SF here are the *national fallback* values baked into the default `MarketData`; the
@@ -1124,6 +1151,15 @@ only place the full engine runs live, one parcel at a time, cached, re-run only 
   take is NOT netted out of the buildable footprint. A full-coverage garden building with
   surface parking is geometrically impossible; v1 knowingly ignores this. Revisit when
   adding real massing.
+- **Ground-floor active-use mandate is applied district-wide, not per street segment.** The
+  ZR ties active frontage to *designated street segments* (e.g. Subtitle I § 601), not to
+  whole zones, and v1 has no street-centerline/segment data to join against. So every
+  mid/high-rise parcel in a district flagged `requires_ground_floor_active` takes the
+  carve-out, including parcels with no designated frontage. Scope of the overstatement after
+  v1.3.2: **mid/high-rise only, inside mandated districts only** — it no longer touches
+  townhome/garden, and no longer touches any parcel outside the MU-/D- corridors. Before
+  v1.3.2 it applied to every prototype in those districts and was the single largest
+  distortion in the bake. Fix needs a street-segment layer.
 - Coverage-ratio setback simplification (§3.2) — no true setback geometry without lot dimensions.
 - Ward-level rents — submarket averages; parcel-level comps are the data-moat upgrade.
 - Historic parcels gated, not modeled — HPRB-compatible redevelopment is a later feature.

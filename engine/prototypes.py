@@ -43,6 +43,23 @@ PROTOTYPES: dict[str, Prototype] = {
     ),
 }
 
+# §5: which prototypes can carry a non-residential ground floor at all.
+#
+# `zoning_rules.requires_ground_floor_active` is a property of the DISTRICT, but the carve-out
+# it triggers is only meaningful for building types that actually have a commercial ground
+# floor. A rowhouse does not, and neither does a garden-apartment walk-up; applying the
+# mandate to them modelled mandatory ground-floor retail in a rowhouse, which cost a third of
+# the building's revenue (the ground floorplate is one of three floors) while costing it at
+# full hard $/SF. That single defect, not the economics of the MU/D districts, was what drove
+# every mandated-zone parcel negative — forcing the flag ON in RF-1 and R-2 reproduced the
+# same −46/SF those zones showed.
+#
+# Membership is stated explicitly rather than derived from `construction_type`. Today
+# CONCRETE_I happens to select exactly {midrise, highrise}, but that is a coincidence of the
+# current library: a podium-construction midrise would break the derivation silently, and
+# "has a commercial ground floor" is not the same claim as "is built of concrete".
+GROUND_FLOOR_ACTIVE_PROTOTYPES: frozenset[str] = frozenset({"midrise", "highrise"})
+
 # §5: national fallback hard $/SF, used when a submarket MarketData row is unavailable.
 NATIONAL_HARD_COST_PSF = {
     "townhome": 200,

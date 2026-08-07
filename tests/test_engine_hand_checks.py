@@ -8,6 +8,8 @@ Shared constants used throughout (SPEC §2.8 DEFAULT_ASSUMPTIONS):
     parking $/stall: surface 5,000 | structured 35,000 | podium 45,000
 """
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -311,52 +313,98 @@ def test_d_negative_rlv_highrise():
 
 
 # ---------------------------------------------------------------------------
-# (e) REQUIRED GROUND-FLOOR ACTIVE USE — same parcel as (b), mandate ON.
-#     The ground floorplate is costed at hard $/SF but earns nothing.
+# (e) REQUIRED GROUND-FLOOR ACTIVE USE (v1.3.2). The ground floorplate is costed at
+#     hard $/SF but earns nothing. The carve-out is gated on the PROTOTYPE as well as
+#     the district: only midrise/highrise plausibly have a commercial ground floor, so
+#     townhome and garden are exempt even inside a mandating district.
 # ---------------------------------------------------------------------------
-def test_e_ground_floor_active_carveout():
+def _gfa_case():
+    """A mandating district tall enough to admit midrise (min_stories = 5)."""
     parcel = Parcel(ssl="0500 0012", lot_area_sf=20_000, zone_code="TEST-GFA",
                     submarket_id="ward5", land_value=1_000_000,
                     improvement_value=0, land_use_code="vacant", improvement_ratio=0.0)
-    rules = ZoningRules(district_code="TEST-GFA", max_far=6.0, max_height_ft=40,
+    rules = ZoningRules(district_code="TEST-GFA", max_far=6.0, max_height_ft=60,
                         max_stories=None,
                         lot_occupancy_pct={"residential": 0.60, "other": 0.80},
                         permitted_uses=[Use.RESIDENTIAL],
                         parking_ratio={"residential": 1.0},
                         requires_ground_floor_active=True)
+    return parcel, rules
+
+
+def test_e_ground_floor_active_carveout_applies_to_midrise():
+    parcel, rules = _gfa_case()
     env = resolve_envelope(parcel, rules, Use.RESIDENTIAL, DEFAULT_ASSUMPTIONS)
-    prog = fit_program(env, PROTOTYPES["garden"], rules, Use.RESIDENTIAL,
+    # ENVELOPE HAND CHECK
+    #   floors_by_height = 60 // 10                  = 6   (max_stories None -> "height")
+    #   far_gsf          = 20,000 * 6.0              = 120,000
+    #   footprint        = 20,000 * 0.60             = 12,000
+    #   coverage_gsf     = 12,000 * 6                = 72,000
+    #   coverage 72,000 < far 120,000 -> max_gsf = 72,000, binding = "height"
+    assert env.max_floors == 6
+    assert env.max_buildable_gsf == 72_000
+    assert env.binding_constraint == "height"
+
+    prog = fit_program(env, PROTOTYPES["midrise"], rules, Use.RESIDENTIAL,
                        DEFAULT_ASSUMPTIONS, parcel)
-    # PROGRAM HAND CHECK (identical envelope to (b): 48,000 GSF over 4 floors)
-    #   required_active_sf = min(footprint 12,000, gross 48,000)  = 12,000
-    #   residential_gsf    = 48,000 - 12,000                      = 36,000
-    #   net                = 36,000 * 0.85                        = 30,600
-    #   units              = int(30,600 // 790) = int(38.734)     = 38
-    #   stalls             = round(38 * 1.0)                      = 38
-    #   gross_sf stays 48,000 -> the shell IS costed
-    assert prog.gross_sf == 48_000
+    # PROGRAM HAND CHECK
+    #   floors             = min(12, 6)                           = 6
+    #   gross_sf           = min(72,000, 12,000 * 6)              = 72,000
+    #   required_active_sf = min(footprint 12,000, gross 72,000)  = 12,000
+    #   residential_gsf    = 72,000 - 12,000                      = 60,000
+    #   net                = 60,000 * 0.80                        = 48,000
+    #   avg_sf   = 0.25*500 + 0.50*750 + 0.25*1050                = 762.5
+    #   units    = int(48,000 // 762.5) = int(62.95)              = 62
+    #   stalls   = round(62 * 1.0)                                = 62
+    #   gross_sf stays 72,000 -> the shell IS costed
+    assert prog.gross_sf == 72_000
     assert prog.retail_sf == 12_000
-    assert prog.net_rentable_sf == pytest.approx(30_600)
-    assert prog.unit_count == 38
-    assert prog.parking_stalls == 38
+    assert prog.net_rentable_sf == pytest.approx(48_000)
+    assert prog.unit_count == 62
+    assert prog.parking_stalls == 62
 
     out = screening_rlv(prog, _market(), DEFAULT_ASSUMPTIONS, parcel)
     # RLV HAND CHECK
-    #   gross_residential = 30,600 * 3.20 * 12          =  1,175,040
-    #   egi               = 1,175,040 * 0.94            =  1,104,537.60
-    #   noi               = 1,104,537.60 * 0.65         =    717,949.44
-    #   exit_value        = 717,949.44 / 0.055          = 13,053,626.181818
-    #   hard shell        = 48,000 * 210 (FULL gross)   = 10,080,000
-    #   hard parking      = 38 * 5,000                  =    190,000
-    #   hard              =                               10,270,000
-    #   soft              = 10,270,000 * 0.20           =  2,054,000
-    #   contingency       = 10,270,000 * 0.05           =    513,500
-    #   cost_ex_land      =                               12,837,500
-    #   profit            = 13,053,626.181818 * 0.15    =  1,958,043.927273
-    #   RLV = 13,053,626.181818 - 12,837,500 - 1,958,043.927273
-    #                                                   = -1,741,917.745455
-    # The mandate costs 1,875,359.67 - (-1,741,917.75) = 3,617,277.42 of RLV vs. case (b).
-    assert out.screening_rlv == pytest.approx(-1_741_917.745455, abs=1.0)
+    #   gross_residential = 48,000 * 3.20 * 12           =  1,843,200
+    #   egi               = 1,843,200 * 0.94             =  1,732,608
+    #   noi               = 1,732,608 * 0.65             =  1,126,195.20
+    #   exit_value        = 1,126,195.20 / 0.055         = 20,476,276.363636
+    #   hard shell        = 72,000 * 340 (FULL gross)    = 24,480,000
+    #   hard parking      = 62 * 45,000 (podium)         =  2,790,000
+    #   hard              =                                27,270,000
+    #   soft              = 27,270,000 * 0.20            =  5,454,000
+    #   contingency       = 27,270,000 * 0.05            =  1,363,500
+    #   cost_ex_land      =                                34,087,500
+    #   profit            = 20,476,276.363636 * 0.15     =  3,071,441.454545
+    #   RLV = 20,476,276.363636 - 34,087,500 - 3,071,441.454545
+    #                                                    = -16,682,665.090909
+    assert out.screening_rlv == pytest.approx(-16_682_665.090909, abs=1.0)
+
+
+@pytest.mark.parametrize("proto_id", ["townhome", "garden"])
+def test_e_ground_floor_active_exempts_low_rise(proto_id):
+    """v1.3.2: a rowhouse or walk-up never carries a mandated commercial ground floor.
+
+    Same parcel and same mandating district as the midrise case above. The program must
+    come out identical to the one the *unmandated* district produces — no floorplate is
+    carved out, so no revenue is lost. Before v1.3.2 this cost townhome ~108 $/SF of RLV
+    in every mandated district and was what inverted the map.
+    """
+    parcel, rules = _gfa_case()
+    env = resolve_envelope(parcel, rules, Use.RESIDENTIAL, DEFAULT_ASSUMPTIONS)
+    unmandated = replace(rules, requires_ground_floor_active=False)
+
+    on = fit_program(env, PROTOTYPES[proto_id], rules, Use.RESIDENTIAL,
+                     DEFAULT_ASSUMPTIONS, parcel)
+    off = fit_program(env, PROTOTYPES[proto_id], unmandated, Use.RESIDENTIAL,
+                      DEFAULT_ASSUMPTIONS, parcel)
+
+    assert on.retail_sf == 0.0
+    # every square foot built is residential -> net is the full efficiency ratio of gross
+    assert on.net_rentable_sf == pytest.approx(
+        on.gross_sf * PROTOTYPES[proto_id].efficiency_ratio
+    )
+    assert on == off
 
 
 # ---------------------------------------------------------------------------
