@@ -151,6 +151,211 @@ def zoning_info(zone_code: str | None, rules: ZoningRules | None) -> ZoningInfo:
     )
 
 
+def market_snapshot(market: Any) -> dict:
+    """The exact MarketData used, for `scenarios.market_snapshot` (SPEC §7.1, v1.2).
+
+    A saved scenario NEVER re-reads live market data, so every value the model consumed is
+    frozen here — including the per-input provenance tags, which is what makes a saved
+    scenario's confidence reproducible rather than recomputed against a newer seed.
+    """
+    return {
+        "submarket_id": market.submarket_id,
+        "rent_psf_residential_monthly": market.rent_psf_residential_monthly,
+        "retail_rent_psf_annual": market.retail_rent_psf_annual,
+        "exit_cap_rate": market.exit_cap_rate,
+        "hard_cost_psf": {
+            (k.value if hasattr(k, "value") else str(k)): v
+            for k, v in market.hard_cost_psf.items()
+        },
+        "as_of": str(market.as_of),
+        "source": market.source,
+        "input_provenance": dict(getattr(market, "input_provenance", {}) or {}),
+    }
+
+
+def underwrite_response(result: dict) -> dict:
+    """A full-tier result -> the 1b drill-down payload.
+
+    Assembled here rather than in the router so the underwrite endpoints, the scenario
+    save, and the export all serialise one result the same way.
+    """
+    import numpy as np
+
+    from api.schemas import (
+        AssumptionSet, CashFlowOut, EnvelopeOut, FeasibilityValue, ProgramOut,
+        ReturnMetrics, SourcesUses,
+    )
+
+    record = result["record"]
+    parcel = result["parcel"]
+    program = result["program"]
+    envelope = result["envelope"]
+    outputs = result["outputs"]
+    screening = result["screening"]
+    cf = result["cashflow"]
+    assumptions = result["assumptions"]
+
+    parcel_id = parcel.ssl
+    full_rlv = float(result["full_rlv"])
+    screening_rlv_value = float(screening.screening_rlv)
+    difference = full_rlv - screening_rlv_value
+    difference_pct = (
+        difference / abs(screening_rlv_value) if screening_rlv_value else None
+    )
+
+    def series(vector) -> list[float]:
+        return [float(x) for x in np.asarray(vector, dtype=float)]
+
+    costs = (
+        np.asarray(cf.land, dtype=float)
+        + np.asarray(cf.hard_cost, dtype=float)
+        + np.asarray(cf.soft_cost, dtype=float)
+        + np.asarray(cf.contingency, dtype=float)
+    )
+    equity_draws = -np.minimum(np.asarray(cf.equity_cf, dtype=float), 0.0)
+
+    hard_total = float(np.sum(cf.hard_cost))
+    soft_total = float(np.sum(cf.soft_cost))
+    contingency_total = float(np.sum(cf.contingency))
+    land_total = float(np.sum(cf.land))
+    interest_total = float(np.sum(cf.construction_interest))
+    equity_total = float(np.sum(equity_draws))
+
+    # The construction loan is principal draws PLUS capitalized interest. Interest is not
+    # paid in cash during construction — it accrues onto the balance (§6.4), so the loan
+    # funds it. Reporting draws alone leaves sources short of uses by exactly the interest,
+    # and a sources & uses chart whose two bars disagree is worse than no chart.
+    loan_total = float(np.sum(cf.construction_draw)) + interest_total
+
+    unit_count = program.unit_count or 0
+    construction_type = (
+        program.construction_type.value
+        if hasattr(program.construction_type, "value")
+        else str(program.construction_type)
+    )
+
+    # The return the panel shows is measured at the assessed land value, not at the solved
+    # RLV — at the solved RLV it is the hurdle by construction. `irr_basis` travels with it.
+    irr_at_assessed = result.get("irr_at_assessed")
+    assessed = result.get("assessed_land_value")
+    basis = (
+        "Assessed land value" if irr_at_assessed is not None
+        else "Unavailable — no assessed land value on record"
+    )
+
+    return dict(
+        computed_at=result["computed_at"],
+        parcel_id=parcel_id,
+        display_name=display_name(record.get("address"), parcel_id),
+        address=record.get("address"),
+        ward=ward_name(record.get("submarket_id")),
+        lot_area_sf=parcel.lot_area_sf,
+        prototype_id=result["prototype_id"],
+        is_bake_best=any(
+            r.get("is_best") and r["prototype_id"] == result["prototype_id"]
+            for r in result["baked_rows"]
+        ),
+        feasibility_value=FeasibilityValue(
+            full=full_rlv,
+            screening=screening_rlv_value,
+            difference=difference,
+            difference_pct=difference_pct,
+        ),
+        feasibility_gap=_clean(outputs.feasibility_gap),
+        per_unit_value=(full_rlv / unit_count) if unit_count else None,
+        returns=ReturnMetrics(
+            irr=_clean(irr_at_assessed),
+            irr_basis=basis,
+            irr_basis_value=_clean(assessed),
+            equity_multiple=_clean(outputs.equity_multiple),
+            yield_on_cost=_clean(outputs.yield_on_cost) or 0.0,
+            profit_margin=_clean(outputs.profit_margin) or 0.0,
+            total_development_cost=_clean(outputs.total_development_cost) or 0.0,
+            noi=_clean(outputs.noi) or 0.0,
+            exit_value=_clean(outputs.exit_value) or 0.0,
+            peak_equity=_clean(outputs.peak_equity),
+            cost_per_unit=(
+                (outputs.total_development_cost / unit_count) if unit_count else None
+            ),
+            target_return=result["hurdle"],
+            irr_target_unachievable=bool(result["irr_target_unachievable"]),
+        ),
+        program=ProgramOut(
+            prototype_id=program.prototype_id,
+            construction_type=construction_type,
+            gross_sf=program.gross_sf,
+            net_rentable_sf=program.net_rentable_sf,
+            unit_count=unit_count,
+            unit_mix_counts=dict(program.unit_mix_counts or {}),
+            retail_sf=program.retail_sf,
+            parking_stalls=program.parking_stalls,
+            parking_type=program.parking_type,
+            parking_phrase=vocab.parking_phrase(program.parking_stalls, program.parking_type),
+            floors=program.floors,
+            avg_unit_sf=(program.net_rentable_sf / unit_count) if unit_count else None,
+            rent_psf_monthly=result["market"].rent_psf_residential_monthly,
+        ),
+        envelope=EnvelopeOut(
+            max_buildable_gsf=envelope.max_buildable_gsf,
+            max_footprint_sf=envelope.max_footprint_sf,
+            max_floors=envelope.max_floors,
+            binding_constraint=envelope.binding_constraint,
+            binding_constraint_label=vocab.binding_constraint_label(envelope.binding_constraint),
+            admissible=envelope.admissible,
+            reason=envelope.reason,
+        ),
+        sources_uses=SourcesUses(
+            uses={
+                "construction": hard_total,
+                "soft_costs": soft_total,
+                "contingency": contingency_total,
+                "land": land_total,
+                "loan_interest": interest_total,
+            },
+            sources={"construction_loan": loan_total, "equity": equity_total},
+            uses_total=hard_total + soft_total + contingency_total + land_total + interest_total,
+            sources_total=loan_total + equity_total,
+            balanced=abs(
+                (hard_total + soft_total + contingency_total + land_total + interest_total)
+                - (loan_total + equity_total)
+            ) < 1.0,
+        ),
+        cashflow=CashFlowOut(
+            months=cf.months,
+            phase_bounds=dict(cf.phase_bounds),
+            land=series(cf.land),
+            hard_cost=series(cf.hard_cost),
+            soft_cost=series(cf.soft_cost),
+            contingency=series(cf.contingency),
+            noi=series(cf.noi),
+            construction_draw=series(cf.construction_draw),
+            construction_balance=series(cf.construction_balance),
+            construction_interest=series(cf.construction_interest),
+            perm_balance=series(cf.perm_balance),
+            perm_debt_service=series(cf.perm_debt_service),
+            equity_cf=series(cf.equity_cf),
+            cumulative_cost=series(np.cumsum(costs)),
+            cumulative_equity=series(np.cumsum(equity_draws)),
+        ),
+        developability=developability(record.get("existing_building_sf")),
+        confidence=outputs.confidence,
+        applied_overrides=result["applied_overrides"],
+        overrides_changed=sum(len(v) for v in result["applied_overrides"].values()),
+        assumptions=AssumptionSet(
+            assumption_set_id="working",
+            name="Working inputs",
+            timeline=dict(assumptions.timeline),
+            cost=dict(assumptions.cost),
+            revenue=dict(assumptions.revenue),
+            debt=dict(assumptions.debt),
+            exit=dict(assumptions.exit),
+            envelope=dict(assumptions.envelope),
+            program=dict(assumptions.program),
+        ),
+        market_snapshot=market_snapshot(result["market"]),
+    )
+
+
 def labels_block() -> dict:
     """The whole vocabulary, shipped in /meta so the client keeps no copy."""
     return {

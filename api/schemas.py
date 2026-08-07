@@ -289,4 +289,162 @@ class AssumptionSet(BaseModel):
     program: dict
 
 
+# ---------------------------------------------------------------------------
+# /parcel/{parcel_id}/underwrite
+# ---------------------------------------------------------------------------
+class UnderwriteRequest(BaseModel):
+    """Assumption overrides for a re-underwrite (the 1c modal's "Re-underwrite parcel").
+
+    Only the six editable groups; `program` is stamped by the prototype at fit time.
+    Unknown keys are ignored rather than widening the model's input surface.
+    """
+    prototype_id: str | None = Field(
+        None, description="Override the bake's best build ('Try another prototype')"
+    )
+    include_demolition: bool | None = Field(
+        None, description="The 1b demolition toggle. Default off; never applied in the bake."
+    )
+    timeline: dict = {}
+    cost: dict = {}
+    revenue: dict = {}
+    debt: dict = {}
+    exit: dict = {}
+    envelope: dict = {}
+
+    def overrides(self) -> dict:
+        return {
+            "timeline": self.timeline, "cost": self.cost, "revenue": self.revenue,
+            "debt": self.debt, "exit": self.exit, "envelope": self.envelope,
+        }
+
+
+class ProgramOut(BaseModel):
+    """The 1b Program card. Labels come from /meta; this is the data behind them."""
+    prototype_id: str
+    construction_type: str
+    gross_sf: float
+    net_rentable_sf: float
+    unit_count: int
+    unit_mix_counts: dict
+    retail_sf: float
+    parking_stalls: int
+    parking_type: str
+    parking_phrase: str = Field(description='"12 stalls, surface" — never "12 podium"')
+    floors: int
+    avg_unit_sf: float | None
+    rent_psf_monthly: float
+
+
+class EnvelopeOut(BaseModel):
+    """The "gated by" callout (SPEC §10)."""
+    max_buildable_gsf: float
+    max_footprint_sf: float
+    max_floors: int
+    binding_constraint: str
+    binding_constraint_label: str | None
+    admissible: bool
+    reason: str = ""
+
+
+class ReturnMetrics(BaseModel):
+    """The 1b metric grid.
+
+    `irr` is measured at the ASSESSED land value, not at the solved RLV. At the solved RLV
+    the IRR is the hurdle by construction (that is what the solve does), so it would read
+    17.00% on every parcel and rank nothing. `irr_basis` says which price it used so the
+    number can never be mistaken for a target.
+    """
+    irr: float | None
+    irr_basis: str
+    irr_basis_value: float | None
+    equity_multiple: float | None
+    yield_on_cost: float
+    profit_margin: float
+    total_development_cost: float
+    noi: float
+    exit_value: float
+    peak_equity: float | None
+    cost_per_unit: float | None
+    target_return: float = Field(description="The hurdle the RLV was solved against")
+    irr_target_unachievable: bool = Field(
+        description="True when no land price, even $0, reaches the hurdle (SPEC fix #8)"
+    )
+
+
+class FeasibilityValue(BaseModel):
+    """Both tiers, side by side. SPEC §11 accepts that they diverge; the UI must label it.
+
+    `full` is the levered IRR-based RLV (§6.8) and leads the panel. `screening` is the
+    unlevered margin-based RLV (§3.4) — the number the MAP is coloured by, recomputed here
+    under the same assumptions so any difference is the tier split and not stale inputs.
+    """
+    full: float
+    screening: float
+    difference: float
+    difference_pct: float | None
+    full_label: str = "Full underwriting"
+    screening_label: str = "Screening estimate"
+
+
+class SourcesUses(BaseModel):
+    """The 1b stacked-bar chart. Uses and sources each sum to total development cost.
+
+    `construction_loan` includes capitalized interest: interest accrues onto the balance
+    during construction rather than being paid in cash (§6.4), so the loan funds it. That
+    is what makes the two bars balance.
+    """
+    uses: dict[str, float]
+    sources: dict[str, float]
+    uses_total: float
+    sources_total: float
+    balanced: bool = Field(
+        description="Sources equal uses to within $1. False means a modelling bug, not a "
+                    "rounding artefact — the UI should not draw the chart."
+    )
+
+
+class CashFlowOut(BaseModel):
+    """Monthly vectors for the Cash flow tab and the S-curve, length months+1."""
+    months: int
+    phase_bounds: dict
+    land: list[float]
+    hard_cost: list[float]
+    soft_cost: list[float]
+    contingency: list[float]
+    noi: list[float]
+    construction_draw: list[float]
+    construction_balance: list[float]
+    construction_interest: list[float]
+    perm_balance: list[float]
+    perm_debt_service: list[float]
+    equity_cf: list[float]
+    cumulative_cost: list[float] = Field(description="S-curve teal series")
+    cumulative_equity: list[float] = Field(description="S-curve amber dashed series")
+
+
+class UnderwriteResponse(BaseModel):
+    computed_at: datetime
+    parcel_id: str
+    display_name: str
+    address: str | None
+    ward: str | None
+    lot_area_sf: float | None
+    prototype_id: str
+    is_bake_best: bool
+    feasibility_value: FeasibilityValue
+    feasibility_gap: float | None
+    per_unit_value: float | None
+    returns: ReturnMetrics
+    program: ProgramOut
+    envelope: EnvelopeOut
+    sources_uses: SourcesUses
+    cashflow: CashFlowOut
+    developability: Developability
+    confidence: float
+    applied_overrides: dict
+    overrides_changed: int
+    assumptions: AssumptionSet
+    market_snapshot: dict
+
+
 MetaResponse.model_rebuild()

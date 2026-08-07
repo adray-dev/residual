@@ -173,6 +173,25 @@ def underwrite(
     outputs.confidence = screening.confidence
     outputs.irr_target_unachievable = unachievable
 
+    # --- the return the UI actually shows -----------------------------------
+    # `outputs.irr` here is the hurdle by construction: solve_irr_rlv found the land value
+    # at which IRR equals the hurdle, so evaluating the cash flow there returns it. That is
+    # arithmetic, not a finding — it is 17.00% on every parcel in DC and ranks nothing.
+    #
+    # The informative question is "if I bought at today's assessed land value, what would I
+    # earn?", so the displayed annual return re-runs the model at the ASSESSED price. That
+    # varies enormously (-6% to +46% across a small sample) and is what the return filter
+    # and the drill-down's return tile report.
+    #
+    # None when the parcel carries no assessed land value (938 of 132,632 — untaxed or
+    # exempt land). The UI shows an em-dash; it must not fall back to the hurdle, which
+    # would silently present a target as a result.
+    assessed = parcel.land_value
+    irr_at_assessed: float | None = None
+    if assessed is not None and assessed > 0:
+        _, at_assessed = full_cashflow(program, market, assumptions, parcel, land=assessed)
+        irr_at_assessed = at_assessed.irr
+
     result = {
         "parcel": parcel,
         "record": record,
@@ -187,6 +206,8 @@ def underwrite(
         "full_rlv": full_rlv,
         "irr_target_unachievable": unachievable,
         "hurdle": hurdle,
+        "irr_at_assessed": irr_at_assessed,
+        "assessed_land_value": assessed,
         "prototype_id": prototype_id,
         "baked_rows": baked,
         "computed_at": batch,
@@ -200,14 +221,18 @@ def underwrite(
 
 
 def irr_for_row(conn, row: dict, batch: datetime) -> float | None:
-    """Levered IRR for one already-read map row, for the IRR filter.
+    """Annual return for one already-read map row, for the return filter.
+
+    Returns the IRR at the ASSESSED land value, matching what the drill-down shows — the
+    filter and the panel must agree, or a parcel could pass the filter and then display a
+    different number.
 
     `batch` is threaded in from the caller's pinned batch rather than re-resolved, so the
     filter cannot cross bakes mid-request.
 
-    Returns None when the parcel cannot be underwritten or the IRR does not converge —
-    both mean "does not meet the threshold" for filtering purposes, and neither may raise
-    (SPEC fix #8: IRR failures never propagate to the caller).
+    None when the parcel cannot be underwritten, has no assessed value, or the IRR does
+    not converge. All three mean "cannot be shown to clear the threshold", and none may
+    raise (SPEC fix #8: IRR failures never propagate to the caller).
     """
     try:
         result = underwrite(conn, row["ssl"], batch, prototype_id=row.get("prototype_id"))
@@ -217,6 +242,6 @@ def irr_for_row(conn, row: dict, batch: datetime) -> float | None:
         # A genuine bug should not turn a 200-row filter into a 500 — but it must not be
         # silently indistinguishable from "below threshold" either, so it is logged.
         import logging
-        logging.getLogger(__name__).exception("IRR filter failed for %s", row.get("ssl"))
+        logging.getLogger(__name__).exception("Return filter failed for %s", row.get("ssl"))
         return None
-    return result["outputs"].irr
+    return result["irr_at_assessed"]

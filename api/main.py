@@ -24,7 +24,13 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from api.routers import assumptions, map as map_router, meta, parcels
+from api.routers import (
+    assumptions,
+    map as map_router,
+    meta,
+    parcels,
+    underwrite as underwrite_router,
+)
 from api.settings import settings
 from data.repositories import database_url
 
@@ -64,6 +70,10 @@ app.add_middleware(
 
 app.include_router(meta.router)
 app.include_router(map_router.router)
+# The underwrite router mounts BEFORE the parcel router: both match
+# `/parcel/{parcel_id:path}`, and a path converter is greedy, so `/parcel/X/underwrite`
+# would otherwise be swallowed by the record route with parcel_id="X/underwrite".
+app.include_router(underwrite_router.router)
 app.include_router(parcels.router)
 app.include_router(assumptions.router)
 
