@@ -228,7 +228,9 @@ def rows_for_parcel(
     if parcel.is_historic:
         return [_status_row(parcel, STATUS_HISTORIC, REASON_HISTORIC, computed_at)]
 
-    rules = rules_by_zone.get(parcel.zone_code) if parcel.zone_code else None
+    # Exact district first, then the base district for overlay-tagged codes (`R-3/GT` →
+    # `R-3`). Shared with the live API path so the two cannot drift (SPEC §8).
+    rules = repo.resolve_rules(rules_by_zone, parcel.zone_code)
     if rules is None:
         # fix #1: an unencoded district is represented with its zone code as the reason,
         # not a crash. Coverage grows as §8 is extended; no rework here.

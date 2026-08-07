@@ -9,7 +9,7 @@ import json
 import os
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Mapping
 
 import psycopg
 from psycopg.rows import dict_row
@@ -50,6 +50,45 @@ _PARCEL_COLS = """
     ssl, lot_area_sf, zone_code, submarket_id, land_value, improvement_value,
     improvement_ratio, land_use_code, existing_building_sf, is_exempt, is_historic
 """
+
+
+def base_district(zone_code: str | None) -> str | None:
+    """The base district of a zone code, with any overlay tag stripped.
+
+    DC zone codes carry overlay tags after a slash: `R-3/GT` is the R-3 district inside the
+    Georgetown overlay. The BASE district drives the envelope and the overlay is a separate
+    modifier (not modeled in v1), so `parcels.zone_code` keeps the full code verbatim and
+    only rule LOOKUP strips the tag. Stored data is never rewritten.
+    """
+    if not zone_code:
+        return None
+    return zone_code.split("/", 1)[0].strip() or None
+
+
+def resolve_rules(
+    rules_by_zone: Mapping[str, ZoningRules], zone_code: str | None
+) -> ZoningRules | None:
+    """Look up rules for a zone code: EXACT match first, base district second.
+
+    Exact-first matters and is not just an optimisation. Not every slash is an overlay:
+    Subtitle H names the Neighborhood Mixed-Use zones as base/overlay PAIRS that each carry
+    their own standards (NMU-4/CP is FAR 2.0, NMU-4/WP is FAR 2.5, NMU-4/GA is 50 ft), so a
+    bare `NMU-4` row would be wrong for every one of them. Encoding `NMU-4/CP` makes the
+    exact match win; encoding only `R-3` still resolves `R-3/GT` through the fallback.
+
+    This is the ONE definition of the matching rule. The bake resolves against its in-memory
+    dict and `get_rules` resolves against the database, both through here, so the batch path
+    and the live API path cannot drift apart.
+    """
+    if not zone_code:
+        return None
+    rules = rules_by_zone.get(zone_code)
+    if rules is not None:
+        return rules
+    base = base_district(zone_code)
+    if base is None or base == zone_code:
+        return None
+    return rules_by_zone.get(base)
 
 
 def database_url() -> str:
@@ -177,13 +216,21 @@ def count_parcels(conn) -> int:
 # reference data
 # ---------------------------------------------------------------------------
 def get_rules(conn, zone_code: str | None) -> ZoningRules | None:
-    """None when the district is not yet encoded (fix #1) — the bake handles that."""
-    if not zone_code:
+    """None when the district is not yet encoded (fix #1) — the bake handles that.
+
+    Resolves overlay-tagged codes the same way the bake does: exact match first, then the
+    base district (`R-3/GT` → `R-3`). One query covers both — `resolve_rules` picks the
+    winner — so the live path and the batch path share one matching rule.
+    """
+    base = base_district(zone_code)
+    if base is None:
         return None
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM zoning_rules WHERE district_code = %s", (zone_code,))
-        row = cur.fetchone()
-    return _to_rules(row) if row else None
+        cur.execute(
+            "SELECT * FROM zoning_rules WHERE district_code IN (%s, %s)", (zone_code, base)
+        )
+        candidates = {r["district_code"]: _to_rules(r) for r in cur.fetchall()}
+    return resolve_rules(candidates, zone_code)
 
 
 def get_all_rules(conn) -> dict[str, ZoningRules]:

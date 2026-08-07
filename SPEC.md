@@ -930,7 +930,32 @@ The only module that runs SQL. Functions:
 
 ## 8. The hand-encoded DC zoning table — starter seed (`data/loaders/seed_zoning.py`)
 
-This is the one genuinely manual reference task. Below is a **starter seed** of core
+**Coverage expansion (pre-Stage-D).** The 11-district starter seed below left 65.4% of DC
+parcels baking as `zone_not_encoded`. It has been extended by 17 districts — R-1A, R-1B,
+R-2, R-3, RF-1, RF-4, MU-3A, MU-5A, MU-6B, MU-7B, MU-9B, MU-10, MU-12, PDR-1…4 — taking
+`zone_not_encoded` to 1.0%. Two rules govern the expansion and both live in code:
+
+- **Overlay-tagged codes resolve to their base district.** `parcels.zone_code` keeps the DC
+  layer's value verbatim (`R-3/GT`); only rule *lookup* strips the tag, via
+  `repositories.resolve_rules` — **exact match first, base district second**. Exact-first is
+  load-bearing: Subtitle H names the NMU zones as base/overlay *pairs* with their own
+  standards (`NMU-4/CP` FAR 2.0 vs `NMU-4/WP` FAR 2.5), so a bare `NMU-4` row would be wrong
+  for every variant. The bake and the live API path share this one function.
+- **Districts with no matter-of-right residential get a row with `permitted_uses=[]`**
+  (PDR-1…4, Subtitle J § 101.2(d)). They bake as `infeasible` — "residential not permitted"
+  — rather than as an uncovered hole in the map.
+
+Expansion values are transcribed from the **consolidated ZR of 2024-03-04** (incorporating
+ZC Order 18-16/19-27), not the per-subtitle PDFs, which predate the MU A/B split the DC
+zoning layer actually uses. Subtitle D Ch. 3 and Subtitle E Ch. 3 impose **no FAR standard**
+at all (bulk is lot occupancy × height); `max_far` is a required float, so those rows carry a
+`NO_FAR_LIMIT` sentinel that can never bind and the bake correctly reports `stories`/`height`
+as the gate. Districts deliberately left unencoded, with reasons, are listed in
+`seed_zoning.NOT_ENCODED_BY_DESIGN` (Downtown D zones need street right-of-way width; CG-4
+and ARTS-2 heights unsourced; NMU needs exact combined codes; `UNZONED` and `StE-*` are not
+matter-of-right districts).
+
+This is the one genuinely manual reference task. Below is the original **starter seed** of core
 development-relevant DC districts with matter-of-right values from the 2016 Zoning Regulations,
 so Stage C can run on day one. **These values must be human-verified against the current ZR
 before production use** — they are best-effort starting points, flagged tune/verify. FAR and
