@@ -322,11 +322,16 @@ def get_default_assumption_set(conn) -> Assumptions | None:
 _BAKE_INSERT = """
 INSERT INTO bake_results (
     ssl, prototype_id, is_best, status, screening_rlv, feasibility_gap,
-    rlv_total, rlv_per_buildable_sf, confidence, binding_constraint, computed_at
+    rlv_total, rlv_per_buildable_sf, confidence, binding_constraint,
+    noi, total_development_cost, yield_on_cost, profit_margin, exit_value,
+    gross_sf, net_rentable_sf, unit_count, floors, computed_at
 ) VALUES (
     %(ssl)s, %(prototype_id)s, %(is_best)s, %(status)s, %(screening_rlv)s,
     %(feasibility_gap)s, %(rlv_total)s, %(rlv_per_buildable_sf)s,
-    %(confidence)s, %(binding_constraint)s, %(computed_at)s
+    %(confidence)s, %(binding_constraint)s,
+    %(noi)s, %(total_development_cost)s, %(yield_on_cost)s, %(profit_margin)s,
+    %(exit_value)s, %(gross_sf)s, %(net_rentable_sf)s, %(unit_count)s, %(floors)s,
+    %(computed_at)s
 )
 ON CONFLICT (ssl, prototype_id, computed_at) DO NOTHING
 """
@@ -338,6 +343,10 @@ def write_bake_results(conn, rows: Iterable[dict]) -> int:
     Both ranking metrics are written by the bake, never derived on read. `rlv_total`
     defaults to `screening_rlv` (they are the same number under two names); status rows
     leave both NULL.
+
+    The nine screening columns (v1.6) default to None rather than being required, because
+    status rows genuinely have none of them — an exempt parcel has no NOI. Scored rows
+    always supply all nine; `.get` is the sentinel path, not the normal one.
     """
     params = [
         {
@@ -351,6 +360,15 @@ def write_bake_results(conn, rows: Iterable[dict]) -> int:
             "rlv_per_buildable_sf": r.get("rlv_per_buildable_sf"),
             "confidence": r.get("confidence"),
             "binding_constraint": r.get("binding_constraint"),
+            "noi": r.get("noi"),
+            "total_development_cost": r.get("total_development_cost"),
+            "yield_on_cost": r.get("yield_on_cost"),
+            "profit_margin": r.get("profit_margin"),
+            "exit_value": r.get("exit_value"),
+            "gross_sf": r.get("gross_sf"),
+            "net_rentable_sf": r.get("net_rentable_sf"),
+            "unit_count": r.get("unit_count"),
+            "floors": r.get("floors"),
             "computed_at": r["computed_at"],
         }
         for r in rows
@@ -431,18 +449,24 @@ def latest_bake_for_map(
     bounds: tuple[float, float, float, float] | None = None,
     objective: str = DEFAULT_MAP_OBJECTIVE,
     filters: dict[str, Any] | None = None,
+    computed_at: datetime | None = None,
 ) -> list[dict]:
-    """Best-per-parcel rows from the latest batch, for the map.
+    """Best-per-parcel rows from one batch (defaults to the latest), for the map.
 
     `objective` picks the sort measure, and every option is a STORED column — the read
     path never divides (SPEC §9). It defaults to `rlv_total`, which is also the objective
     `is_best` is pinned to at bake time, so the map colors the measure the bake optimized.
     `filters` accepts `status`, `min_confidence`, `submarket_id`.
+
+    Pass `computed_at` to pin the batch explicitly. The API resolves it ONCE per request and
+    threads it into every read, so a bake that commits mid-request cannot leave the tiles on
+    one batch and the table on another. Left None, each statement re-evaluates LATEST_BATCH
+    independently — fine for a one-shot script, wrong for a multi-query request.
     """
     filters = filters or {}
-    # Scoped to the latest batch AND is_best: exactly one row per parcel (SPEC §9).
-    where = [f"b.computed_at = {LATEST_BATCH}", "b.is_best"]
-    params: list[Any] = []
+    # Scoped to one batch AND is_best: exactly one row per parcel (SPEC §9).
+    where = [f"b.computed_at = COALESCE(%s, {LATEST_BATCH})", "b.is_best"]
+    params: list[Any] = [computed_at]
 
     if bounds is not None:
         where.append("p.parcel_geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)")
@@ -463,7 +487,11 @@ def latest_bake_for_map(
         cur.execute(
             f"""SELECT b.ssl, b.prototype_id, b.status, b.screening_rlv, b.feasibility_gap,
                        b.rlv_total, b.rlv_per_buildable_sf,
-                       b.confidence, b.binding_constraint, p.lot_area_sf, p.submarket_id
+                       b.confidence, b.binding_constraint,
+                       b.noi, b.total_development_cost, b.yield_on_cost, b.profit_margin,
+                       b.exit_value, b.gross_sf, b.net_rentable_sf, b.unit_count, b.floors,
+                       p.lot_area_sf, p.submarket_id, p.zone_code, p.land_value,
+                       p.existing_building_sf
                 FROM bake_results b JOIN parcels p USING (ssl)
                 WHERE {' AND '.join(where)}
                 ORDER BY {order} DESC NULLS LAST, b.ssl""",

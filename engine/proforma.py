@@ -71,6 +71,7 @@ def screening_rlv(
         peak_equity=None,
         confidence=0.0,   # filled by the caller
         exit_value=exit_value,
+        noi=noi,
     )
 
 
@@ -239,6 +240,7 @@ def full_cashflow(
         peak_equity=peak_equity,
         confidence=0.0,
         exit_value=gross_sale,
+        noi=stabilized_noi,
     )
 
     cashflow = CashFlow(

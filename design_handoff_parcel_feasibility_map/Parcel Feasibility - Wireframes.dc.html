@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEDE9;font-family:'Public Sans',system-ui,sans-serif}
+a{color:#0E7C7B}a:hover{color:#0A5C5B}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1A1D1C;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 'Public Sans',sans-serif;color:#1A1D1C}
+.dv-opts{display:flex;flex-direction:column;gap:44px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1A1D1C;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 'Public Sans',sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden}
+.dv-opt:target .dv-oid{background:#0E7C7B;color:#fff}
+.dv-next{margin:26px 0 0;font:12px/1.6 'Public Sans',sans-serif;color:rgba(0,0,0,.5)}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Parcel feasibility platform — screen set, 1440×900</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Map + filters + parcel popup — click any parcel; floating overlays on a full-bleed map</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#E6E3DC">
+
+<div style="position:absolute;inset:0;overflow:hidden;background:#E2DFD7">
+<div style="position:absolute;inset:0;background:#F4F2ED"></div>
+<sc-for list="{{ roads }}" as="r" hint-placeholder-count="6">
+<div style="position:absolute;background:#FFFFFF" style-hover="background:#FFFFFF"></div>
+</sc-for>
+<sc-for list="{{ parcels }}" as="p" hint-placeholder-count="40">
+<div onClick="{{ pick }}" data-id="{{ p.id }}" title="{{ p.ssl }}" style="position:absolute;left:{{ p.x }}px;top:{{ p.y }}px;width:{{ p.w }}px;height:{{ p.h }}px;background:{{ p.fill }};border:{{ p.border }};border-radius:1.5px;cursor:pointer;transition:filter .12s" style-hover="filter:brightness(1.08)"></div>
+</sc-for>
+<div style="position:absolute;left:{{ selX }}px;top:{{ selY }}px;width:{{ selW }}px;height:{{ selH }}px;border:2.5px solid #1A1D1C;border-radius:2px;pointer-events:none;box-shadow:0 0 0 3px rgba(255,255,255,.75)"></div>
+</div>
+
+<div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:18px;padding:0 20px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px">
+<svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg>
+<div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div>
+</div>
+<div style="flex:1;max-width:460px;display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;background:#F4F2ED;border:1px solid rgba(0,0,0,.1);border-radius:8px">
+<div style="width:13px;height:13px;border:1.8px solid #8A8781;border-radius:50%"></div>
+<div style="font:400 13.5px 'Public Sans',sans-serif;color:#1A1D1C">Shaw, Ward 6</div>
+<div style="margin-left:auto;font:400 11px 'IBM Plex Mono',monospace;color:#A5A29B">address · parcel ID · ward</div>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+<div style="display:flex;align-items:center;gap:7px;height:34px;padding:0 13px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">Shortlist<span style="font:600 10.5px 'IBM Plex Mono',monospace;background:#0E7C7B;color:#fff;border-radius:9px;padding:1.5px 6px">7</span></div>
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">Table view</div>
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">Export</div>
+<div style="width:32px;height:32px;border-radius:50%;background:#D8D4CC"></div>
+</div>
+</div>
+
+<div style="position:absolute;top:84px;left:20px;width:288px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:11px;box-shadow:0 6px 24px rgba(0,0,0,.11);overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px">
+<div style="font:600 13px 'Public Sans',sans-serif;color:#1A1D1C">Filters</div>
+<div style="font:500 11.5px 'Public Sans',sans-serif;color:#0E7C7B">Reset</div>
+</div>
+<div style="height:1px;background:rgba(0,0,0,.07)"></div>
+
+<div style="padding:15px 16px 4px">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase;margin-bottom:9px">Geography</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ wards }}" as="w" hint-placeholder-count="5">
+<div style="padding:5px 10px;border-radius:14px;border:1px solid {{ w.bd }};background:{{ w.bg }};color:{{ w.fg }};font:500 11.5px 'Public Sans',sans-serif">{{ w.name }}</div>
+</sc-for>
+</div>
+<div style="margin-top:10px;height:34px;border:1px dashed rgba(0,0,0,.22);border-radius:7px;display:flex;align-items:center;justify-content:center;gap:7px;font:500 12px 'Public Sans',sans-serif;color:#5C5952">
+<div style="width:11px;height:11px;border:1.6px solid #5C5952"></div>Draw an area on the map</div>
+</div>
+
+<div style="padding:16px 16px 4px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase">Feasibility value</div>
+<div style="font:500 11.5px 'IBM Plex Mono',monospace;color:#1A1D1C">$1.2M – $9M+</div>
+</div>
+<div style="position:relative;height:4px;border-radius:2px;background:#E6E3DC">
+<div style="position:absolute;left:14%;right:0;top:0;bottom:0;background:#0E7C7B;border-radius:2px"></div>
+<div style="position:absolute;left:14%;top:-5px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:2px solid #0E7C7B;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+<div style="position:absolute;left:100%;top:-5px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:2px solid #0E7C7B;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+</div>
+</div>
+
+<div style="padding:20px 16px 4px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase">Annual return ≥</div>
+<div style="font:500 11.5px 'IBM Plex Mono',monospace;color:#1A1D1C">17.0%</div>
+</div>
+<div style="position:relative;height:4px;border-radius:2px;background:#E6E3DC">
+<div style="position:absolute;left:0;width:52%;top:0;bottom:0;background:#0E7C7B;border-radius:2px"></div>
+<div style="position:absolute;left:52%;top:-5px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:2px solid #0E7C7B;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+</div>
+<sc-if value="{{ helper }}" hint-placeholder-val="{{ true }}"><div style="margin-top:8px;font:400 10.5px 'Public Sans',sans-serif;color:#A5A29B">Runs the full model on the filtered set — slower</div></sc-if>
+</div>
+
+<div style="padding:20px 16px 6px">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase;margin-bottom:9px">Prototype</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+<sc-for list="{{ protoChips }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:7px;border:1px solid {{ c.bd }};background:{{ c.bg }}">
+<div style="width:13px;height:13px;border-radius:3px;border:1.5px solid {{ c.mk }};background:{{ c.mkbg }}"></div>
+<div style="font:500 12px 'Public Sans',sans-serif;color:#1A1D1C">{{ c.name }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:16px;margin-top:8px;border-top:1px solid rgba(0,0,0,.07);display:flex;align-items:center;justify-content:space-between">
+<div style="font:400 12px 'Public Sans',sans-serif;color:#5C5952"><span style="font:600 13px 'IBM Plex Mono',monospace;color:#1A1D1C">4,182</span> parcels match</div>
+<div style="padding:8px 14px;border-radius:7px;background:#1A1D1C;color:#fff;font:600 12px 'Public Sans',sans-serif">See table</div>
+</div>
+</div>
+
+<div style="position:absolute;top:84px;right:20px;width:236px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:11px;box-shadow:0 6px 24px rgba(0,0,0,.11);padding:14px 15px 15px;box-sizing:border-box">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase;margin-bottom:10px">Color by</div>
+<div style="display:flex;gap:4px;padding:3px;background:#F4F2ED;border-radius:7px;margin-bottom:14px">
+<div onClick="{{ setObjTotal }}" style="flex:1;text-align:center;padding:6px 4px;border-radius:5px;background:{{ objTotalBg }};color:{{ objTotalFg }};font:600 11px 'Public Sans',sans-serif;box-shadow:{{ objTotalSh }};cursor:pointer">Total value</div>
+<div onClick="{{ setObjSf }}" style="flex:1;text-align:center;padding:6px 4px;border-radius:5px;background:{{ objSfBg }};color:{{ objSfFg }};font:600 11px 'Public Sans',sans-serif;box-shadow:{{ objSfSh }};cursor:pointer">Value / SF</div>
+</div>
+<div style="height:9px;border-radius:3px;background:linear-gradient(90deg,#EDEAE4,#CFE3E0,#93C9C3,#4FA39D,#0E7C7B,#0A5250)"></div>
+<div style="display:flex;justify-content:space-between;margin-top:6px;font:400 10.5px 'IBM Plex Mono',monospace;color:#8A8781"><span>{{ rampLo }}</span><span>{{ rampHi }}</span></div>
+<sc-if value="{{ helper }}" hint-placeholder-val="{{ true }}"><div style="margin-top:8px;font:400 10px 'Public Sans',sans-serif;color:#A5A29B;line-height:1.4">Ranked within the current view · quick estimate</div></sc-if>
+<div style="height:1px;background:rgba(0,0,0,.07);margin:13px 0 11px"></div>
+<sc-for list="{{ statusKeys }}" as="s" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+<div style="width:13px;height:13px;border-radius:3px;background:{{ s.fill }};border:{{ s.border }}"></div>
+<div style="font:400 11.5px 'Public Sans',sans-serif;color:#5C5952">{{ s.label }}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="position:absolute;left:{{ popX }}px;top:{{ popY }}px;transform:translate(-50%,-100%);width:300px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:11px;box-shadow:0 10px 34px rgba(0,0,0,.19);overflow:hidden">
+<div style="padding:13px 15px 12px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+<div>
+<div style="font:600 14px 'Public Sans',sans-serif;color:#1A1D1C;line-height:1.25">{{ sel.addr }}</div>
+<div style="font:400 11px 'IBM Plex Mono',monospace;color:#8A8781;margin-top:3px">Parcel ID {{ sel.ssl }} · {{ sel.ward }}</div>
+</div>
+<div style="width:22px;height:22px;border-radius:5px;border:1px solid rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font:400 13px 'Public Sans',sans-serif;color:#8A8781">×</div>
+</div>
+</div>
+<div style="height:1px;background:rgba(0,0,0,.07)"></div>
+<div style="padding:13px 15px 12px;display:flex;align-items:flex-end;gap:16px">
+<div>
+<div style="font:600 9.5px 'IBM Plex Mono',monospace;letter-spacing:.6px;color:#8A8781;text-transform:uppercase">Feasibility value</div>
+<div style="font:600 25px 'Public Sans',sans-serif;color:#0E7C7B;letter-spacing:-.6px;line-height:1.15;margin-top:3px">{{ sel.rlvFmt }}</div>
+</div>
+<div style="padding-bottom:4px">
+<div style="font:600 9.5px 'IBM Plex Mono',monospace;letter-spacing:.6px;color:#8A8781;text-transform:uppercase">Per unit</div>
+<div style="font:600 15px 'IBM Plex Mono',monospace;color:#1A1D1C;margin-top:3px">{{ sel.perUnitFmt }}</div>
+</div>
+</div>
+<div style="padding:0 15px 13px">
+<sc-for list="{{ popRows }}" as="row" hint-placeholder-count="4">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-top:1px solid rgba(0,0,0,.06)">
+<div style="font:400 11.5px 'Public Sans',sans-serif;color:#5C5952">{{ row.k }}</div>
+<div style="font:500 12px 'IBM Plex Mono',monospace;color:#1A1D1C">{{ row.v }}</div>
+</div>
+</sc-for>
+</div>
+<div style="padding:0 15px 14px;display:flex;gap:8px">
+<div style="flex:1;text-align:center;padding:9px 0;border-radius:7px;background:#0E7C7B;color:#fff;font:600 12px 'Public Sans',sans-serif">Open full underwriting</div>
+<div style="padding:9px 12px;border-radius:7px;border:1px solid rgba(0,0,0,.14);font:600 12px 'Public Sans',sans-serif;color:#3D3B37">Save</div>
+</div>
+</div>
+
+<div style="position:absolute;left:20px;bottom:18px;display:flex;gap:8px">
+<div style="display:flex;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.09);overflow:hidden">
+<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font:400 17px 'Public Sans',sans-serif;color:#3D3B37">+</div>
+<div style="width:1px;background:rgba(0,0,0,.08)"></div>
+<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font:400 17px 'Public Sans',sans-serif;color:#3D3B37">−</div>
+</div>
+<div style="height:34px;padding:0 12px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.09);font:500 11.5px 'Public Sans',sans-serif;color:#3D3B37">154,318 parcels</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Parcel drill-down — right side panel, full levered model with S-curve and sources &amp; uses</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#E6E3DC">
+<div style="position:absolute;top:64px;left:0;bottom:0;right:{{ panelW }}px;overflow:hidden;background:#F4F2ED">
+<div style="position:absolute;inset:0;transform-origin:0 0;transition:transform .55s cubic-bezier(.4,0,.2,1);transform:{{ zoomTf }}">
+<sc-for list="{{ parcels }}" as="p" hint-placeholder-count="40">
+<div onClick="{{ pick }}" data-id="{{ p.id }}" title="{{ p.ssl }}" style="position:absolute;left:{{ p.x }}px;top:{{ p.y }}px;width:{{ p.w }}px;height:{{ p.h }}px;background:{{ p.fill }};border:{{ p.border }};border-radius:1.5px;cursor:pointer;opacity:{{ p.op }};transition:opacity .35s"></div>
+</sc-for>
+<div style="position:absolute;left:{{ selX }}px;top:{{ selY }}px;width:{{ selW }}px;height:{{ selH }}px;border:{{ ringBd }} solid #1A1D1C;border-radius:2px;box-shadow:0 0 0 {{ ringGlow }} rgba(255,255,255,.8);pointer-events:none"></div>
+<div style="position:absolute;left:{{ tagX }}px;top:{{ tagY }}px;transform:translate(-50%,0) scale({{ invZ }});transform-origin:50% 0;padding:4px 9px;border-radius:6px;background:#1A1D1C;color:#fff;font:600 11px 'IBM Plex Mono',monospace;white-space:nowrap;pointer-events:none">{{ sel.addr }}</div>
+</div>
+<div style="position:absolute;left:16px;bottom:16px;display:flex;gap:8px;align-items:center">
+<div style="height:32px;padding:0 12px;display:flex;align-items:center;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.09);font:500 11.5px 'Public Sans',sans-serif;color:#0E7C7B">Zoom out to view</div>
+</div>
+</div>
+<div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:18px;padding:0 20px;background:rgba(255,255,255,.92);border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div></div>
+<div style="flex:1;max-width:460px;display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;background:#F4F2ED;border:1px solid rgba(0,0,0,.1);border-radius:8px"><div style="width:13px;height:13px;border:1.8px solid #8A8781;border-radius:50%"></div><div style="font:400 13.5px 'Public Sans',sans-serif;color:#1A1D1C">{{ sel.addr }}</div></div>
+</div>
+
+<div style="position:absolute;top:64px;right:0;bottom:0;width:{{ panelW }}px;background:#fff;border-left:1px solid rgba(0,0,0,.1);box-shadow:-8px 0 30px rgba(0,0,0,.1);display:flex;flex-direction:column;box-sizing:border-box">
+
+<div style="padding:14px 22px 11px;border-bottom:1px solid rgba(0,0,0,.07)">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+<div>
+<div style="font:600 19px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.3px">{{ sel.addr }}</div>
+<div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#8A8781;margin-top:4px">Parcel ID {{ sel.ssl }} · {{ sel.ward }} · {{ sel.lotFmt }} lot</div>
+</div>
+<div style="display:flex;gap:7px">
+<div style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font:400 13px 'Public Sans',sans-serif;color:#5C5952">☆</div>
+<div style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font:400 15px 'Public Sans',sans-serif;color:#5C5952">×</div>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+<div style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:5px;background:#EAF2F1;font:500 11px 'Public Sans',sans-serif;color:#0A5250">Best build · Garden walk-up</div>
+<div style="padding:4px 9px;border-radius:5px;background:#F4F2ED;font:500 11px 'Public Sans',sans-serif;color:#5C5952">Limited by height</div>
+<div style="padding:4px 9px;border-radius:5px;background:#FBF0E4;font:500 11px 'Public Sans',sans-serif;color:#8A5A21">Low confidence · default inputs</div>
+</div>
+</div>
+
+<div style="display:flex;gap:2px;padding:10px 22px 0;border-bottom:1px solid rgba(0,0,0,.07)">
+<sc-for list="{{ detailTabs }}" as="t" hint-placeholder-count="4">
+<div style="padding:9px 13px 11px;font:600 12.5px 'Public Sans',sans-serif;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.name }}</div>
+</sc-for>
+</div>
+
+<div style="flex:1;overflow:hidden;padding:14px 22px 0">
+
+<div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:10px">
+<div>
+<div style="font:600 9.5px 'IBM Plex Mono',monospace;letter-spacing:.6px;color:#8A8781;text-transform:uppercase">Financial feasibility (RLV)</div>
+<div style="display:flex;align-items:baseline;gap:10px;margin-top:5px">
+<div style="font:600 30px 'Public Sans',sans-serif;color:#0E7C7B;letter-spacing:-.8px;line-height:1">$1.72M</div>
+<div style="font:500 13px 'IBM Plex Mono',monospace;color:#8A8781">$72K per unit · 24 units</div>
+</div>
+<sc-if value="{{ helper }}" hint-placeholder-val="{{ true }}"><div style="font:400 11px 'Public Sans',sans-serif;color:#A5A29B;margin-top:6px">Map estimate was $1.84M — the full model runs the debt and timing, so the two differ.</div></sc-if>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.08);border-radius:9px;overflow:hidden">
+<sc-for list="{{ metrics }}" as="m" hint-placeholder-count="8">
+<div style="background:#fff;padding:8px 12px 9px">
+<div style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.4px;color:#8A8781;text-transform:uppercase;line-height:1.3;height:22px">{{ m.k }}</div>
+<div style="font:600 17px 'IBM Plex Mono',monospace;color:#1A1D1C;margin-top:2px">{{ m.v }}</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:11px">
+<div style="border:1px solid rgba(0,0,0,.08);border-radius:9px;padding:10px 12px 8px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font:600 11.5px 'Public Sans',sans-serif;color:#1A1D1C">Cost draw S-curve</div><div style="font:400 10px 'IBM Plex Mono',monospace;color:#A5A29B">51 months</div></div>
+<svg viewBox="0 0 240 96" preserveAspectRatio="none" style="width:100%;height:70px;margin-top:8px;overflow:visible">
+<line x1="0" y1="88" x2="240" y2="88" stroke="rgba(0,0,0,.12)" stroke-width="1"></line>
+<line x1="0" y1="46" x2="240" y2="46" stroke="rgba(0,0,0,.06)" stroke-width="1"></line>
+<rect x="0" y="0" width="56" height="88" fill="rgba(0,0,0,.035)"></rect>
+<rect x="56" y="0" width="113" height="88" fill="rgba(14,124,123,.07)"></rect>
+<polyline points="{{ scurve }}" fill="none" stroke="#0E7C7B" stroke-width="2.2" stroke-linejoin="round"></polyline>
+<polyline points="{{ equityCurve }}" fill="none" stroke="#C08A3E" stroke-width="1.8" stroke-dasharray="4 3"></polyline>
+</svg>
+<div style="display:flex;gap:14px;margin-top:4px">
+<div style="display:flex;align-items:center;gap:5px;font:400 10px 'Public Sans',sans-serif;color:#5C5952"><div style="width:10px;height:2px;background:#0E7C7B"></div>Cumulative cost</div>
+<div style="display:flex;align-items:center;gap:5px;font:400 10px 'Public Sans',sans-serif;color:#5C5952"><div style="width:10px;height:2px;background:#C08A3E"></div>Equity drawn</div>
+</div>
+</div>
+<div style="border:1px solid rgba(0,0,0,.08);border-radius:9px;padding:10px 12px 8px">
+<div style="font:600 11.5px 'Public Sans',sans-serif;color:#1A1D1C">Sources &amp; uses</div>
+<div style="margin-top:10px">
+<sc-for list="{{ waterfall }}" as="b" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+<div style="width:74px;font:400 10.5px 'Public Sans',sans-serif;color:#5C5952;text-align:right">{{ b.k }}</div>
+<div style="flex:1;height:13px;background:#F4F2ED;border-radius:2px;position:relative">
+<div style="position:absolute;left:{{ b.off }}%;width:{{ b.w }}%;top:0;bottom:0;background:{{ b.c }};border-radius:2px"></div>
+</div>
+<div style="width:52px;font:500 10.5px 'IBM Plex Mono',monospace;color:#1A1D1C;text-align:right">{{ b.v }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="margin-top:11px;border:1px solid rgba(0,0,0,.08);border-radius:9px;overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:#FAF9F6">
+<div style="font:600 11.5px 'Public Sans',sans-serif;color:#1A1D1C">Program — garden walk-up, 3 floors</div>
+<div style="font:500 11px 'Public Sans',sans-serif;color:#0E7C7B">Try another prototype</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(0,0,0,.07)">
+<sc-for list="{{ program }}" as="g" hint-placeholder-count="8">
+<div style="background:#fff;padding:7px 12px 8px">
+<div style="font:400 10px 'Public Sans',sans-serif;color:#8A8781">{{ g.k }}</div>
+<div style="font:500 13px 'IBM Plex Mono',monospace;color:#1A1D1C;margin-top:2px">{{ g.v }}</div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-top:1px solid rgba(0,0,0,.07)">
+<div>
+<div style="font:500 11.5px 'Public Sans',sans-serif;color:#1A1D1C">Include demolition — 6,400 SF existing building</div>
+<sc-if value="{{ helper }}" hint-placeholder-val="{{ true }}"><div style="font:400 10px 'Public Sans',sans-serif;color:#A5A29B;margin-top:1px">Adds $12/SF of teardown cost at the start of construction</div></sc-if>
+</div>
+<div style="width:36px;height:20px;border-radius:10px;background:#D8D4CC;position:relative"><div style="position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></div></div>
+</div>
+</div>
+</div>
+
+<div style="padding:11px 22px;border-top:1px solid rgba(0,0,0,.07);display:flex;gap:9px;align-items:center;background:#FAF9F6">
+<div style="flex:1;text-align:center;padding:10px 0;border-radius:8px;background:#1A1D1C;color:#fff;font:600 12.5px 'Public Sans',sans-serif">Edit assumptions &amp; re-underwrite</div>
+<div style="padding:11px 15px;border-radius:8px;border:1px solid rgba(0,0,0,.14);font:600 12.5px 'Public Sans',sans-serif;color:#3D3B37">Save scenario</div>
+<div style="padding:11px 15px;border-radius:8px;border:1px solid rgba(0,0,0,.14);font:600 12.5px 'Public Sans',sans-serif;color:#3D3B37">Export</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Assumptions &amp; scenario editor — full modal, provenance tags drive the confidence score</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#E6E3DC">
+<div style="position:absolute;inset:0;background:#F4F2ED"></div>
+<sc-for list="{{ parcels }}" as="p" hint-placeholder-count="20">
+<div style="position:absolute;left:{{ p.x }}px;top:{{ p.y }}px;width:{{ p.w }}px;height:{{ p.h }}px;background:{{ p.fill }};border-radius:1.5px;opacity:.5"></div>
+</sc-for>
+<div style="position:absolute;inset:0;background:rgba(26,29,28,.42)"></div>
+
+<div style="position:absolute;left:50%;top:44px;transform:translateX(-50%);width:1000px;height:846px;background:#fff;border-radius:13px;box-shadow:0 26px 70px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box">
+<div style="padding:18px 24px 15px;border-bottom:1px solid rgba(0,0,0,.08);display:flex;align-items:flex-start;justify-content:space-between">
+<div>
+<div style="font:600 18px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.3px">Inputs — Defaults</div>
+<div style="font:400 12px 'Public Sans',sans-serif;color:#8A8781;margin-top:4px">Editing for <span style="font:500 12px 'Public Sans',sans-serif;color:#1A1D1C">{{ sel.addr }}</span> only</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<div style="padding:8px 13px;border-radius:7px;border:1px solid rgba(0,0,0,.14);font:600 12px 'Public Sans',sans-serif;color:#3D3B37">Reset to defaults</div>
+<div style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font:400 15px 'Public Sans',sans-serif;color:#5C5952">×</div>
+</div>
+</div>
+
+<div style="display:flex;flex:1;overflow:hidden">
+<div style="width:190px;border-right:1px solid rgba(0,0,0,.07);padding:14px 12px;box-sizing:border-box;background:#FAF9F6">
+<sc-for list="{{ assumpNav }}" as="n" hint-placeholder-count="7">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-radius:7px;background:{{ n.bg }};margin-bottom:2px">
+<div style="font:{{ n.font }};color:{{ n.fg }}">{{ n.name }}</div>
+<div style="font:500 10px 'IBM Plex Mono',monospace;color:{{ n.cfg }}">{{ n.count }}</div>
+</div>
+</sc-for>
+<div style="margin-top:18px;padding:11px;border-radius:8px;background:#FBF0E4">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.5px;color:#8A5A21;text-transform:uppercase">Confidence</div>
+<div style="font:600 22px 'IBM Plex Mono',monospace;color:#8A5A21;margin-top:3px">{{ confVal }}</div>
+</div>
+</div>
+
+<div style="flex:1;overflow:hidden;padding:16px 24px">
+<sc-for list="{{ assumpGroups }}" as="grp" hint-placeholder-count="3">
+<div style="margin-bottom:14px">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:9px">
+<div style="font:600 12.5px 'Public Sans',sans-serif;color:#1A1D1C">{{ grp.name }}</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">
+<sc-for list="{{ grp.rows }}" as="r" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="flex:1;font:400 12px 'Public Sans',sans-serif;color:#3D3B37">{{ r.k }}</div>
+<div style="width:104px;height:30px;border:1px solid {{ r.bd }};border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding:0 9px;box-sizing:border-box;background:{{ r.bg }};font:500 12.5px 'IBM Plex Mono',monospace;color:#1A1D1C">{{ r.v }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:14px 24px;border-top:1px solid rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;background:#FAF9F6">
+<div style="font:400 12px 'Public Sans',sans-serif;color:#8A8781">3 inputs changed from default</div>
+<div style="margin-left:auto;display:flex;gap:9px">
+<div style="padding:11px 16px;border-radius:8px;border:1px solid rgba(0,0,0,.14);font:600 12.5px 'Public Sans',sans-serif;color:#3D3B37">Cancel</div>
+<div style="padding:11px 20px;border-radius:8px;background:#0E7C7B;color:#fff;font:600 12.5px 'Public Sans',sans-serif">Re-underwrite parcel</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Table view — the filtered set as rows, sorted on the stored ranking column</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#fff">
+<div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:18px;padding:0 20px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div></div>
+<div style="display:flex;gap:2px;margin-left:14px">
+<div style="padding:8px 14px;border-radius:7px;font:600 12.5px 'Public Sans',sans-serif;color:#8A8781">Map</div>
+<div style="padding:8px 14px;border-radius:7px;background:#F4F2ED;font:600 12.5px 'Public Sans',sans-serif;color:#1A1D1C">Table</div>
+</div>
+<div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">Compare 3 selected</div>
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border-radius:7px;background:#1A1D1C;color:#fff;font:600 12.5px 'Public Sans',sans-serif">Export CSV</div>
+</div>
+</div>
+
+<div style="position:absolute;top:64px;left:0;right:0;height:52px;display:flex;align-items:center;gap:9px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.07);box-sizing:border-box;background:#FAF9F6">
+<div style="font:400 12px 'Public Sans',sans-serif;color:#5C5952"><span style="font:600 13px 'IBM Plex Mono',monospace;color:#1A1D1C">4,182</span> parcels</div>
+<div style="width:1px;height:18px;background:rgba(0,0,0,.1)"></div>
+<sc-for list="{{ tableChips }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:14px;background:#EAF2F1;font:500 11.5px 'Public Sans',sans-serif;color:#0A5250">{{ c }}<span style="color:#4FA39D">×</span></div>
+</sc-for>
+<div style="display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:14px;border:1px dashed rgba(0,0,0,.2);font:500 11.5px 'Public Sans',sans-serif;color:#5C5952">+ Add filter</div>
+<div style="margin-left:auto;font:400 12px 'Public Sans',sans-serif;color:#8A8781">Sorted by {{ sortLabel }} · click a column to re-sort</div>
+</div>
+
+<div style="position:absolute;top:116px;left:0;right:0;bottom:0;overflow:hidden">
+<div style="display:grid;grid-template-columns:34px 236px 76px 112px 110px 110px 110px 132px 84px 84px 1fr;align-items:center;gap:0;padding:0 20px;height:38px;border-bottom:1px solid rgba(0,0,0,.1);background:#fff;box-sizing:border-box">
+<sc-for list="{{ tableHead }}" as="h" hint-placeholder-count="10">
+<div onClick="{{ h.onSort }}" data-sort="{{ h.key }}" style="display:flex;align-items:center;justify-content:{{ h.j }};gap:4px;padding-right:12px;cursor:{{ h.cur }};font:600 9.5px 'IBM Plex Mono',monospace;letter-spacing:.6px;color:{{ h.fg }};text-transform:uppercase">{{ h.k }}<span style="font:600 9px 'Public Sans',sans-serif;color:#0E7C7B">{{ h.arrow }}</span></div>
+</sc-for>
+</div>
+<sc-for list="{{ tableRows }}" as="row" hint-placeholder-count="12">
+<div style="display:grid;grid-template-columns:34px 236px 76px 112px 110px 110px 110px 132px 84px 84px 1fr;align-items:center;padding:0 20px;height:{{ row.h }}px;border-bottom:1px solid rgba(0,0,0,.05);background:{{ row.bg }};box-sizing:border-box">
+<div style="width:14px;height:14px;border-radius:3.5px;border:1.5px solid {{ row.ckbd }};background:{{ row.ckbg }}"></div>
+<div style="padding-right:12px"><div style="font:500 12.5px 'Public Sans',sans-serif;color:#1A1D1C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.addr }}</div><div style="font:400 10px 'IBM Plex Mono',monospace;color:#A5A29B;margin-top:1px">{{ row.ssl }}</div></div>
+<div style="font:400 12px 'Public Sans',sans-serif;color:#5C5952;padding-right:12px">{{ row.ward }}</div>
+<div style="padding-right:12px"><span style="padding:3px 8px;border-radius:5px;background:{{ row.pbg }};font:500 11px 'Public Sans',sans-serif;color:{{ row.pfg }}">{{ row.proto }}</span></div>
+<div style="text-align:right;padding-right:12px;font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.cost }}</div>
+<div style="text-align:right;padding-right:12px;font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.cpu }}</div>
+<div style="text-align:right;padding-right:12px;font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.noi }}</div>
+<div style="text-align:right;padding-right:12px;font:600 13px 'IBM Plex Mono',monospace;color:{{ row.rlvfg }}">{{ row.rlv }}</div>
+<div style="text-align:right;padding-right:12px;font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.yoc }}</div>
+<div style="text-align:right;padding-right:12px;font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.irr }}</div>
+<div style="display:flex;align-items:center;gap:12px">
+<div style="font:400 12px 'IBM Plex Mono',monospace;color:#5C5952">{{ row.gsf }}</div>
+<div style="margin-left:auto;font:500 11.5px 'Public Sans',sans-serif;color:#0E7C7B">Open</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Compare — three parcels side by side, rows highlight where they diverge</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#fff">
+<div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div></div>
+<div style="font:600 14px 'Public Sans',sans-serif;color:#1A1D1C;margin-left:10px">Compare 3 parcels</div>
+<div style="margin-left:auto;display:flex;gap:8px">
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">Same assumption set</div>
+<div style="height:34px;padding:0 13px;display:flex;align-items:center;border-radius:7px;background:#1A1D1C;color:#fff;font:600 12.5px 'Public Sans',sans-serif">Export comparison</div>
+</div>
+</div>
+<div style="position:absolute;top:64px;left:0;right:0;bottom:0;display:grid;grid-template-columns:220px 1fr 1fr 1fr;overflow:hidden">
+<div style="border-right:1px solid rgba(0,0,0,.07);background:#FAF9F6"></div>
+<sc-for list="{{ compare }}" as="c" hint-placeholder-count="3">
+<div style="border-right:1px solid rgba(0,0,0,.07);padding:18px 20px 0;box-sizing:border-box">
+<div style="height:76px;border-radius:8px;background:{{ c.swatch }};margin-bottom:12px"></div>
+<div style="font:600 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">{{ c.addr }}</div>
+<div style="font:400 11px 'IBM Plex Mono',monospace;color:#8A8781;margin-top:3px">Parcel ID {{ c.ssl }}</div>
+<div style="margin-top:11px;padding:4px 9px;border-radius:5px;background:{{ c.tagbg }};display:inline-block;font:500 11px 'Public Sans',sans-serif;color:{{ c.tagfg }}">{{ c.tag }}</div>
+</div>
+</sc-for>
+</div>
+<div style="position:absolute;top:344px;left:0;right:0;bottom:0;overflow:hidden">
+<sc-for list="{{ compareRows }}" as="r" hint-placeholder-count="10">
+<div style="display:grid;grid-template-columns:220px 1fr 1fr 1fr;align-items:center;height:{{ r.h }}px;border-top:1px solid rgba(0,0,0,.06);background:{{ r.bg }}">
+<div style="padding:0 20px;font:{{ r.kf }};color:#3D3B37;box-sizing:border-box">{{ r.k }}</div>
+<div style="padding:0 20px;font:{{ r.vf }};color:{{ r.c1fg }};box-sizing:border-box">{{ r.a }}</div>
+<div style="padding:0 20px;font:{{ r.vf }};color:{{ r.c2fg }};box-sizing:border-box">{{ r.b }}</div>
+<div style="padding:0 20px;font:{{ r.vf }};color:{{ r.c3fg }};box-sizing:border-box">{{ r.c }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Shortlist &amp; saved scenarios — frozen market snapshots, not live re-reads</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;background:#FAF9F6">
+<div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div></div>
+<div style="font:600 14px 'Public Sans',sans-serif;color:#1A1D1C;margin-left:10px">Shortlist</div>
+<div style="margin-left:auto;display:flex;gap:8px"><div style="height:34px;padding:0 13px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.12);border-radius:7px;font:500 12.5px 'Public Sans',sans-serif;color:#3D3B37">New list</div></div>
+</div>
+<div style="position:absolute;top:64px;left:0;bottom:0;width:250px;border-right:1px solid rgba(0,0,0,.07);background:#fff;padding:16px 14px;box-sizing:border-box">
+<div style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.7px;color:#8A8781;text-transform:uppercase;margin-bottom:10px">Lists</div>
+<sc-for list="{{ lists }}" as="l" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-radius:7px;background:{{ l.bg }};margin-bottom:3px">
+<div style="font:{{ l.font }};color:{{ l.fg }}">{{ l.name }}</div>
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:#8A8781">{{ l.n }}</div>
+</div>
+</sc-for>
+<div style="margin-top:20px;padding:12px;border-radius:9px;border:1px solid rgba(0,0,0,.08);background:#FAF9F6">
+<div style="font:600 11px 'Public Sans',sans-serif;color:#1A1D1C">List totals</div>
+<div style="display:flex;flex-direction:column;gap:7px;margin-top:9px">
+<sc-for list="{{ listTotals }}" as="t" hint-placeholder-count="3">
+<div style="display:flex;justify-content:space-between"><div style="font:400 11.5px 'Public Sans',sans-serif;color:#5C5952">{{ t.k }}</div><div style="font:500 12px 'IBM Plex Mono',monospace;color:#1A1D1C">{{ t.v }}</div></div>
+</sc-for>
+</div>
+</div>
+</div>
+<div style="position:absolute;top:64px;left:250px;right:0;bottom:0;padding:20px;overflow:hidden;box-sizing:border-box">
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+<sc-for list="{{ saved }}" as="s" hint-placeholder-count="6">
+<div style="background:#fff;border:1px solid rgba(0,0,0,.09);border-radius:11px;overflow:hidden">
+<div style="height:82px;background:{{ s.swatch }};position:relative">
+<div style="position:absolute;right:10px;top:10px;padding:3px 8px;border-radius:5px;background:rgba(255,255,255,.94);font:500 10.5px 'Public Sans',sans-serif;color:#3D3B37">{{ s.proto }}</div>
+</div>
+<div style="padding:13px 14px 14px">
+<div style="font:600 14px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">{{ s.addr }}</div>
+<div style="font:400 10.5px 'IBM Plex Mono',monospace;color:#8A8781;margin-top:3px">Parcel ID {{ s.ssl }}</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:11px;gap:{{ savedGap }}px">
+<div><div style="font:500 9.5px 'IBM Plex Mono',monospace;color:#8A8781;text-transform:uppercase;letter-spacing:.4px">{{ s.rlvLbl }}</div><div style="font:600 18px 'Public Sans',sans-serif;color:#0E7C7B;margin-top:2px">{{ s.rlv }}</div></div>
+<div><div style="font:500 9.5px 'IBM Plex Mono',monospace;color:#8A8781;text-transform:uppercase;letter-spacing:.4px">{{ s.irrLbl }}</div><div style="font:600 18px 'Public Sans',sans-serif;margin-top:2px;color:{{ secFg }}">{{ s.irr }}</div></div>
+<div><div style="font:500 9.5px 'IBM Plex Mono',monospace;color:#8A8781;text-transform:uppercase;letter-spacing:.4px">{{ s.yocLbl }}</div><div style="font:600 18px 'Public Sans',sans-serif;margin-top:2px;color:{{ secFg }}">{{ s.yoc }}</div></div>
+</div>
+<div style="margin-top:12px;padding-top:11px;border-top:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between">
+<div style="font:400 10.5px 'Public Sans',sans-serif;color:#A5A29B">{{ s.saved }}</div>
+<div style="font:500 11.5px 'Public Sans',sans-serif;color:#0E7C7B">Open scenario</div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1g">
+<div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Sign-in and first-run empty state</div>
+<div style="display:flex;gap:28px;align-items:flex-start">
+<div class="dv-card" style="width:706px;height:520px;position:relative;background:#fff;display:flex">
+<div style="width:330px;padding:44px 40px;box-sizing:border-box;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:9px"><svg width="24" height="24" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 15px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.2px">Residual</div></div>
+<div style="font:600 24px 'Public Sans',sans-serif;color:#1A1D1C;letter-spacing:-.5px;margin-top:36px;line-height:1.2">Development feasibility, parcel by parcel.</div>
+<div style="font:400 13px/1.55 'Public Sans',sans-serif;color:#8A8781;margin-top:10px">150K+ DC parcels, priced for what they could become.</div>
+<div style="margin-top:28px;display:flex;flex-direction:column;gap:9px">
+<div style="height:40px;border:1px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:center;padding:0 12px;font:400 13px 'Public Sans',sans-serif;color:#A5A29B">Work email</div>
+<div style="height:40px;border:1px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:center;padding:0 12px;font:400 13px 'Public Sans',sans-serif;color:#A5A29B">Password</div>
+<div style="height:40px;border-radius:8px;background:#0E7C7B;color:#fff;display:flex;align-items:center;justify-content:center;font:600 13px 'Public Sans',sans-serif;margin-top:4px">Sign in</div>
+</div>
+</div>
+<div style="flex:1;position:relative;background:#F4F2ED;border-left:1px solid rgba(0,0,0,.07);overflow:hidden">
+<sc-for list="{{ parcels }}" as="p" hint-placeholder-count="20">
+<div style="position:absolute;left:{{ p.x }}px;top:{{ p.y }}px;width:{{ p.w }}px;height:{{ p.h }}px;background:{{ p.fill }};border-radius:1.5px;opacity:.55"></div>
+</sc-for>
+<div style="position:absolute;inset:0;background:linear-gradient(90deg,#F4F2ED 0%,rgba(244,242,237,0) 40%)"></div>
+</div>
+</div>
+<div class="dv-card" style="width:706px;height:520px;position:relative;background:#F4F2ED;overflow:hidden">
+<div style="position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08);box-sizing:border-box">
+<div style="display:flex;align-items:center;gap:9px"><svg width="21" height="21" viewBox="0 0 26 26" style="display:block;flex:none"><rect width="26" height="26" rx="7" fill="#0E7C7B"></rect><rect x="6" y="13" width="4" height="7" rx="1" fill="#FFFFFF" opacity=".5"></rect><rect x="11.5" y="9" width="4" height="11" rx="1" fill="#FFFFFF" opacity=".78"></rect><rect x="17" y="5.5" width="4" height="14.5" rx="1" fill="#FFFFFF"></rect><rect x="5" y="21.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity=".92"></rect></svg><div style="font:700 14px 'Public Sans',sans-serif;color:#1A1D1C">Residual</div></div>
+<div style="flex:1;max-width:300px;height:34px;background:#F4F2ED;border:1px solid rgba(0,0,0,.1);border-radius:8px;display:flex;align-items:center;padding:0 12px;font:400 12.5px 'Public Sans',sans-serif;color:#A5A29B">Search an address, parcel ID, or ward</div>
+</div>
+<div style="position:absolute;top:56px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;padding:34px;box-sizing:border-box">
+<div style="max-width:400px;text-align:center">
+<div style="width:56px;height:56px;border-radius:12px;border:1.5px dashed rgba(0,0,0,.2);margin:0 auto"></div>
+<div style="font:600 16px 'Public Sans',sans-serif;color:#1A1D1C;margin-top:16px">Nothing selected yet</div>
+<div style="font:400 12.5px/1.6 'Public Sans',sans-serif;color:#8A8781;margin-top:7px">Search a neighborhood, or draw an area on the map.</div>
+<div style="display:flex;gap:8px;justify-content:center;margin-top:18px">
+<div style="padding:9px 15px;border-radius:8px;background:#0E7C7B;color:#fff;font:600 12.5px 'Public Sans',sans-serif">Jump to Shaw</div>
+<div style="padding:9px 15px;border-radius:8px;border:1px solid rgba(0,0,0,.14);font:600 12.5px 'Public Sans',sans-serif;color:#3D3B37">Draw an area</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "make the popup in <a class="dv-oid" href="#1a">1a</a> a slim tooltip and push everything into the panel" · "give <a class="dv-oid" href="#1b">1b</a> a monthly cash-flow table instead of the charts" · "new directions for the filter panel"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1540,&quot;height&quot;:1100},&quot;plainLabels&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Language&quot;},&quot;showHelperText&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Language&quot;},&quot;confidenceAsPercent&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Language&quot;},&quot;statusContrast&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Subtle&quot;,&quot;Bold&quot;],&quot;default&quot;:&quot;Bold&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Map&quot;},&quot;zoomOnSelect&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Parcel drill-down (1b)&quot;},&quot;mapZoom&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2.6,&quot;min&quot;:1,&quot;max&quot;:5,&quot;step&quot;:0.2,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Parcel drill-down (1b)&quot;},&quot;panelWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:620,&quot;min&quot;:440,&quot;max&quot;:760,&quot;step&quot;:20,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Parcel drill-down (1b)&quot;},&quot;dimUnselected&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Parcel drill-down (1b)&quot;},&quot;savedMetricGap&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:16,&quot;min&quot;:8,&quot;max&quot;:56,&quot;step&quot;:2,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Shortlist cards (1f)&quot;},&quot;secondaryMetricColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#1A1D1C&quot;,&quot;options&quot;:[&quot;#1A1D1C&quot;,&quot;#5C5952&quot;,&quot;#8A8781&quot;,&quot;#C08A3E&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shortlist cards (1f)&quot;}}">
+class Component extends DCLogic {
+  state = { selId: 118, objective: 'total' };
+
+  rng(seed) { let s = seed; return () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  sort = e => {
+    const k = e.currentTarget.getAttribute('data-sort');
+    if (!k) return;
+    this.setState(s => ({ sortKey: k, sortDir: s.sortKey === k ? -(s.sortDir || -1) : -1 }));
+  };
+
+  money(n) { return n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : '$' + Math.round(n / 1000) + 'K'; }
+
+  build() {
+    const bold = (this.props.statusContrast ?? 'Bold') === 'Bold';
+    if (this._p && this._bold === bold) return this._p;
+    this._bold = bold;
+    const r = this.rng(20260806);
+    const streets = ['P St NW', 'Q St NW', '7th St NW', 'Rhode Island Ave', 'Florida Ave', 'S St NW', '9th St NW', 'T St NW', 'Vermont Ave', 'W St NW', '11th St NW', 'Wiltberger St'];
+    const wardNames = ['Ward 1', 'Ward 2', 'Ward 5', 'Ward 6'];
+    const zones = ['MU-4', 'MU-5', 'RA-2', 'RA-3', 'MU-7', 'RF-1', 'R-3', 'MU-9', 'D-4'];
+    const protos = ['Midrise', 'Townhome', 'Garden', 'Highrise'];
+    const ramp = ['#EDEAE4', '#DCE9E6', '#BEDCD7', '#93C9C3', '#5FAEA8', '#2C918C', '#0E7C7B', '#0A5250'];
+    const P = [], roads = [];
+    const cols = 9, rows = 6, bw = 138, bh = 118, gx = 27, gy = 28, ox = 26, oy = 20;
+    let id = 0;
+    for (let c = 0; c < cols; c++) {
+      for (let rr = 0; rr < rows; rr++) {
+        const bx = ox + c * (bw + gx), by = oy + rr * (bh + gy);
+        const nc = 2 + Math.floor(r() * 3), nr = 2;
+        const cw = (bw - (nc - 1) * 2) / nc, ch = (bh - 2) / nr;
+        for (let i = 0; i < nc; i++) for (let j = 0; j < nr; j++) {
+          const skip = r();
+          if (skip < 0.06) continue;
+          const cx = c / (cols - 1) - 0.5, cy = rr / (rows - 1) - 0.5;
+          const core = 1 - Math.min(1, Math.sqrt(cx * cx + cy * cy * 1.4) * 1.55);
+          let v = Math.max(0, Math.min(1, core * 0.72 + r() * 0.42 - 0.06));
+          const s = r();
+          let st = 'scored';
+          if (s < 0.07) st = 'exempt'; else if (s < 0.12) st = 'historic'; else if (s < 0.155) st = 'zone_not_encoded'; else if (s < 0.26) st = 'infeasible';
+          let fill = ramp[Math.min(ramp.length - 1, Math.floor(v * ramp.length))], border = '1px solid rgba(255,255,255,.85)';
+          if (st === 'exempt') { fill = bold ? 'repeating-linear-gradient(45deg,#C3CBCE 0 3px,#D6DCDE 3px 6px)' : '#E4E1DA'; border = '1px solid rgba(255,255,255,.85)'; }
+          if (st === 'historic') { fill = bold ? '#B0779A' : '#E0D6DD'; border = '1px solid rgba(255,255,255,.85)'; }
+          if (st === 'zone_not_encoded') { fill = '#FFFFFF'; border = bold ? '1.5px dashed #9A958C' : '1px dashed rgba(0,0,0,.22)'; }
+          if (st === 'infeasible') { fill = bold ? '#9C968B' : '#D6D2CA'; border = '1px solid rgba(255,255,255,.85)'; }
+          const lot = Math.round((1800 + r() * 16000) / 50) * 50;
+          const rlv = st === 'scored' ? Math.round((0.35 + v * 9.2) * 1e6 / 1e4) * 1e4 : null;
+          const gsf = Math.round(lot * (1.4 + v * 2.6) / 100) * 100;
+          P.push({
+            id: id++, x: Math.round(bx + i * (cw + 2)), y: Math.round(by + j * (ch + 2)), w: Math.round(cw), h: Math.round(ch),
+            fill, border, st, v, lot, rlv, gsf,
+            ssl: (2800 + Math.floor(r() * 1400)) + ' ' + String(10 + Math.floor(r() * 89)).padStart(4, '0'),
+            addr: (900 + Math.floor(r() * 900)) + ' ' + streets[Math.floor(r() * streets.length)],
+            ward: wardNames[Math.floor(r() * wardNames.length)],
+            zone: zones[Math.floor(r() * zones.length)],
+            proto: protos[Math.floor(r() * protos.length)],
+            use: r() < 0.42 ? 'Vacant land' : (r() < 0.6 ? 'Surface parking' : 'Single-family, 1,240 SF')
+          });
+        }
+        roads.push({ x: bx, y: by });
+      }
+    }
+    this._p = { P, roads };
+    return this._p;
+  }
+
+  renderVals() {
+    const { P, roads } = this.build();
+    const sel = P.find(p => p.id === this.state.selId) || P[0];
+    const obj = this.state.objective;
+    const fmtM = n => n == null ? '—' : this.money(n);
+    const rlvsf = sel.rlv ? Math.round(sel.rlv / sel.gsf) : null;
+
+    const plain = this.props.plainLabels ?? true;
+    const T = (a, b) => plain ? a : b;
+    const helper = this.props.showHelperText ?? false;
+    const panelW = this.props.panelWidth ?? 620;
+    const zoomOn = this.props.zoomOnSelect ?? true;
+    const z = zoomOn ? (this.props.mapZoom ?? 2.6) : 1;
+    const dim = this.props.dimUnselected ?? true;
+    const vw = 1440 - panelW, vh = 836;
+    const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+    const tx = zoomOn ? vw / 2 - cx * z : 0, ty = zoomOn ? vh / 2 - cy * z : 0;
+
+    const on = { bg: '#fff', fg: '#1A1D1C', sh: '0 1px 2px rgba(0,0,0,.14)' };
+    const off = { bg: 'transparent', fg: '#8A8781', sh: 'none' };
+    const t = obj === 'total' ? on : off, s = obj === 'sf' ? on : off;
+
+    const chip = (name, active) => ({ name, bd: active ? '#0E7C7B' : 'rgba(0,0,0,.14)', bg: active ? '#EAF2F1' : '#fff', mk: active ? '#0E7C7B' : 'rgba(0,0,0,.22)', mkbg: active ? '#0E7C7B' : 'transparent' });
+
+    const scurve = [], eq = [];
+    for (let m = 0; m <= 51; m++) {
+      const x = (m / 51) * 240;
+      const p = m < 12 ? (m / 12) * 0.12 : m < 36 ? 0.12 + 0.88 * (1 / (1 + Math.exp(-(m - 24) / 4.4))) : 1;
+      scurve.push(x.toFixed(1) + ',' + (88 - p * 78).toFixed(1));
+      const e = Math.min(1, p / 0.35);
+      eq.push(x.toFixed(1) + ',' + (88 - e * 34).toFixed(1));
+    }
+
+    const wf = [
+      { k: T('Construction', 'Hard cost'), v: '$6.36M', p: 62, off: 0, c: '#0E7C7B' },
+      { k: T('Soft costs', 'Soft (20%)'), v: '$1.27M', p: 12, off: 62, c: '#4FA39D' },
+      { k: 'Contingency', v: '$0.32M', p: 3, off: 74, c: '#93C9C3' },
+      { k: T('Land', 'Land (RLV)'), v: '$1.72M', p: 17, off: 77, c: '#C08A3E' },
+      { k: T('Loan interest', 'Interest res.'), v: '$0.52M', p: 5, off: 94, c: '#D8B378' },
+      { k: T('Construction loan', 'Constr. loan'), v: '$6.62M', p: 65, off: 0, c: '#1A1D1C' },
+      { k: 'Equity', v: '$3.57M', p: 35, off: 65, c: '#8A8781' }
+    ].map(b => ({ k: b.k, v: b.v, w: b.p, off: b.off, c: b.c }));
+
+    const tag = t => t === 'submarket' ? { tag: 'submkt', tagbg: '#EAF2F1', tagfg: '#0A5250' } : t === 'local' ? { tag: 'local', tagbg: '#E6F0E8', tagfg: '#2E6B3C' } : { tag: 'natl', tagbg: '#F1EFEA', tagfg: '#8A8781' };
+    const row = (k, v, prov, edited) => Object.assign({ k, v, bd: edited ? '#0E7C7B' : 'rgba(0,0,0,.14)', bg: edited ? '#F5FAF9' : '#fff' }, tag(prov));
+
+    const derive = p => {
+      const units = Math.max(1, Math.round(p.gsf * 0.8 / 850));
+      const cost = p.gsf * 372;
+      return { units, cost, cpu: cost / units, noi: cost * (0.055 + p.v * 0.022), yoc: 5.4 + p.v * 2.4, irr: 12.4 + p.v * 9.6 };
+    };
+    const tRow = (p, i) => {
+      const d = derive(p);
+      return {
+        h: 46, bg: i % 2 ? '#FAF9F6' : '#fff',
+        ckbd: i < 3 ? '#0E7C7B' : 'rgba(0,0,0,.22)', ckbg: i < 3 ? '#0E7C7B' : 'transparent',
+        addr: p.addr, ssl: 'ID ' + p.ssl, ward: p.ward, proto: p.proto,
+        pbg: p.proto === 'Midrise' ? '#EAF2F1' : p.proto === 'Highrise' ? '#E9EEF4' : '#F4F2ED',
+        pfg: p.proto === 'Midrise' ? '#0A5250' : p.proto === 'Highrise' ? '#2D4A6B' : '#5C5952',
+        rlv: fmtM(p.rlv), rlvfg: '#1A1D1C',
+        cost: this.money(d.cost), cpu: '$' + Math.round(d.cpu / 1000) + 'K', noi: this.money(d.noi),
+        yoc: d.yoc.toFixed(1) + '%', irr: d.irr.toFixed(1) + '%',
+        gsf: p.gsf.toLocaleString()
+      };
+    };
+    const sortKey = this.state.sortKey || 'rlv', sortDir = this.state.sortDir || -1;
+    const sortVal = p => { const d = derive(p); return { rlv: p.rlv, cost: d.cost, cpu: d.cpu, noi: d.noi, yoc: d.yoc, irr: d.irr, gsf: p.gsf }[sortKey] ?? p.rlv; };
+    const scored = P.filter(p => p.st === 'scored').sort((a, b) => (sortVal(a) - sortVal(b)) * sortDir).slice(0, 15);
+
+    const cmp = [
+      { p: scored[0], tag: T('Best feasibility value', 'Best total RLV'), tagbg: '#EAF2F1', tagfg: '#0A5250', swatch: 'linear-gradient(135deg,#0E7C7B,#4FA39D)' },
+      { p: scored[3], tag: T('Highest return', 'Highest IRR'), tagbg: '#E9EEF4', tagfg: '#2D5473', swatch: 'linear-gradient(135deg,#3E6E93,#9FBBD1)' },
+      { p: scored[7], tag: 'Cheapest basis', tagbg: '#FBF0E4', tagfg: '#8A5A21', swatch: 'linear-gradient(135deg,#C08A3E,#E2C384)' }
+    ].map(c => ({ addr: c.p.addr, ssl: c.p.ssl, zone: c.p.zone, tag: c.tag, tagbg: c.tagbg, tagfg: c.tagfg, swatch: c.swatch }));
+
+    const cd = [scored[0], scored[3], scored[7]].map(p => {
+      const d = derive(p);
+      return {
+        p, pu: '$' + Math.round(p.rlv / d.units / 1000) + 'K', irr: d.irr.toFixed(1) + '%', yoc: d.yoc.toFixed(1) + '%',
+        noi: this.money(d.noi), cost: this.money(d.cost), cpu: '$' + Math.round(d.cpu / 1000) + 'K', gsf: p.gsf.toLocaleString()
+      };
+    });
+
+    const COL = ['#0E7C7B', '#3E6E93', '#C08A3E'];
+    const cRow = (k, a, b, c, hi) => ({
+      k, a, b, c, h: 44, hi,
+      kf: "500 12.5px 'Public Sans',sans-serif", vf: (hi ? '600 15px' : '400 13px') + " 'IBM Plex Mono',monospace",
+      c1fg: hi ? COL[0] : '#1A1D1C', c2fg: hi ? COL[1] : '#1A1D1C', c3fg: hi ? COL[2] : '#1A1D1C'
+    });
+
+    const savedCards = scored.slice(0, 6).map((p, i) => ({
+      addr: p.addr, ssl: p.ssl, zone: p.zone, proto: p.proto,
+      rlv: fmtM(p.rlv), irr: (14.2 + i * 1.3).toFixed(1) + '%', yoc: (5.9 + i * 0.3).toFixed(1) + '%', rlvLbl: T('Value', 'RLV'), irrLbl: T('Return', 'IRR'), yocLbl: T('Yield', 'YoC'),
+      saved: 'Saved ' + (2 + i) + ' days ago',
+      swatch: ['linear-gradient(135deg,#0E7C7B,#5FAEA8)', 'linear-gradient(135deg,#2C918C,#BEDCD7)', 'linear-gradient(135deg,#5FAEA8,#DCE9E6)', 'linear-gradient(135deg,#0A5250,#2C918C)', 'linear-gradient(135deg,#93C9C3,#EDEAE4)', 'linear-gradient(135deg,#C08A3E,#D8B378)'][i]
+    }));
+
+    return {
+      parcels: P.map(p => Object.assign({}, p, { op: p.id === sel.id ? 1 : (dim && zoomOn ? 0.42 : 0.85) })),
+      panelW,
+      zoomTf: 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + z + ')',
+      invZ: (1 / z).toFixed(3),
+      ringBd: (2.5 / z).toFixed(2) + 'px',
+      ringGlow: (3 / z).toFixed(2) + 'px',
+      tagX: cx, tagY: sel.y + sel.h + 8 / z,
+      zoomLabel: zoomOn ? z.toFixed(1) + '× · parcel view' : '1.0× · full view',
+      roads,
+      pick: e => { const id = Number(e.currentTarget.getAttribute('data-id')); this.setState({ selId: id }); },
+      setObjTotal: () => this.setState({ objective: 'total' }),
+      setObjSf: () => this.setState({ objective: 'sf' }),
+      objTotalBg: t.bg, objTotalFg: t.fg, objTotalSh: t.sh,
+      objSfBg: s.bg, objSfFg: s.fg, objSfSh: s.sh,
+      rampLo: obj === 'total' ? '$0.4M' : '$28/SF', rampHi: obj === 'total' ? '$9.5M+' : '$210/SF',
+      sel: {
+        addr: sel.addr, ssl: sel.ssl, ward: sel.ward, zone: sel.zone,
+        rlvFmt: fmtM(sel.rlv), rlvsfFmt: rlvsf ? '$' + rlvsf : '—',
+        perUnitFmt: sel.rlv ? '$' + Math.round(sel.rlv / Math.max(1, Math.round(sel.gsf * 0.8 / 850)) / 1000) + 'K' : '—',
+        lotFmt: sel.lot.toLocaleString() + ' SF'
+      },
+      selX: sel.x, selY: sel.y, selW: sel.w, selH: sel.h,
+      popX: Math.max(340, Math.min(1180, sel.x + sel.w / 2)), popY: Math.max(200, sel.y - 8),
+      popRows: [
+        { k: T('Zoning · best build', 'Zoning · best program'), v: sel.zone + ' · ' + sel.proto },
+        { k: T('Buildable floor area', 'Buildable GSF'), v: sel.gsf.toLocaleString() + ' SF' },
+        { k: 'Lot area', v: sel.lot.toLocaleString() + ' SF' },
+        { k: 'Current use', v: sel.use },
+        { k: T('Limited by', 'Gated by'), v: sel.v > 0.5 ? T('Floor-area limit', 'FAR') : T('Height limit', 'height') }
+      ],
+      wards: ['Ward 1', 'Ward 2', 'Ward 5', 'Ward 6', 'Shaw'].map((n, i) => ({
+        name: n, bd: i === 4 ? '#0E7C7B' : 'rgba(0,0,0,.14)', bg: i === 4 ? '#EAF2F1' : '#fff', fg: i === 4 ? '#0A5250' : '#3D3B37'
+      })),
+      protoChips: [chip('Townhome', false), chip('Garden', false), chip('Midrise', true), chip('Highrise', true)],
+      statusKeys: [
+        { label: 'Infeasible under zoning', fill: '#9C968B', border: '1px solid rgba(0,0,0,.06)' },
+        { label: 'Not developable — public / exempt', fill: 'repeating-linear-gradient(45deg,#C3CBCE 0 3px,#D6DCDE 3px 6px)', border: '1px solid rgba(0,0,0,.06)' },
+        { label: 'Historic — restricted', fill: '#B0779A', border: '1px solid rgba(0,0,0,.06)' },
+        { label: 'Zoning not yet covered', fill: '#FFFFFF', border: '1.5px dashed #9A958C' }
+      ],
+      detailTabs: [
+        { name: 'Underwriting', fg: '#1A1D1C', bd: '#0E7C7B' },
+        { name: 'Cash flow', fg: '#8A8781', bd: 'transparent' },
+        { name: 'Zoning', fg: '#8A8781', bd: 'transparent' },
+        { name: 'Parcel record', fg: '#8A8781', bd: 'transparent' }
+      ],
+      helper,
+      confVal: (this.props.confidenceAsPercent ?? true) ? '5.8%' : '0.058',
+      savedGap: this.props.savedMetricGap ?? 16,
+      secFg: this.props.secondaryMetricColor ?? '#1A1D1C',
+      metrics: [
+        { k: T('Annual return (IRR)', 'Levered IRR'), v: '18.4%' }, { k: T('Cash back on equity', 'Equity multiple'), v: '1.71×' },
+        { k: T('Income vs cost', 'Yield on cost'), v: '6.2%' }, { k: 'Profit margin', v: '13.0%' },
+        { k: T('Total cost to build', 'Total dev cost'), v: '$10.2M' }, { k: T('Cost per unit', 'Cost / unit'), v: '$425K' },
+        { k: T('Yearly income (NOI)', 'Stabilized NOI'), v: '$633K' }, { k: T('Sale value at exit', 'Exit value'), v: '$11.5M' }
+      ],
+      scurve: scurve.join(' '), equityCurve: eq.join(' '),
+      waterfall: wf,
+      program: [
+        { k: T('Total floor area', 'Gross SF'), v: '30,000' }, { k: T('Rentable area', 'Net rentable'), v: '27,000' },
+        { k: T('Units (est.)', 'Units (reporting)'), v: '24' }, { k: 'Floors', v: '3' },
+        { k: T('Parking', 'Parking stalls'), v: '12 stalls, surface' }, { k: T('Average unit size', 'Avg unit SF'), v: '1,125 SF' },
+        { k: T('Build type', 'Construction'), v: T('Wood frame', 'Wood V') }, { k: 'Rent', v: '$3.20 /SF/mo' }
+      ],
+      assumpNav: [
+        ['Timeline', '4', true], ['Cost', '6', false], ['Revenue', '5', false],
+        ['Debt', '7', false], ['Exit & return', '4', false], ['Envelope', '2', false], ['Program overrides', '5', false]
+      ].map(([name, count, active]) => ({
+        name, count, bg: active ? '#fff' : 'transparent', fg: active ? '#1A1D1C' : '#5C5952',
+        font: (active ? '600' : '400') + " 12.5px 'Public Sans',sans-serif", cfg: active ? '#0E7C7B' : '#A5A29B'
+      })),
+      assumpGroups: [
+        {
+          name: 'Timeline', note: 'months · absorption is derived from lease-up',
+          rows: [row('Predevelopment', '12', 'national'), row('Construction', '30', 'national', true), row('Lease-up', '12', 'national'), row('Hold after stabilization', '3', 'national')]
+        },
+        {
+          name: 'Cost', note: 'hard $/SF comes from the submarket cost table',
+          rows: [row('Hard cost $/SF', '$340', 'submarket'), row('Soft cost % of hard', '20.0%', 'national'), row('Contingency %', '5.0%', 'national'), row('Parking / stall (structured)', '$45,000', 'national'), row('Cost escalation', '3.0%', 'national'), row('Demo $/SF', '$12', 'national')]
+        },
+        {
+          name: 'Revenue', note: 'revenue = net rentable SF × rent · unit count never enters',
+          rows: [row('Base rent $/SF/mo', '$3.20', 'submarket'), row('Rent premium (midrise)', '1.15×', 'national'), row('Stabilized occupancy', '94.0%', 'national'), row('Opex ratio of EGI', '35.0%', 'national'), row('Rent growth', '3.0%', 'national')]
+        },
+        {
+          name: 'Debt', note: 'interest capitalized into the construction balance',
+          rows: [row('Construction LTC', '68.0%', 'national', true), row('Construction rate', '8.50%', 'national'), row('Perm LTV', '60.0%', 'national'), row('Perm rate', '6.50%', 'national'), row('Amortization (yrs)', '30', 'national'), row('Min DSCR', '1.25', 'national')]
+        },
+        {
+          name: 'Exit & return', note: 'cap adjusted −25 bps for midrise product',
+          rows: [row('Exit cap rate', '5.25%', 'submarket', true), row('Selling cost', '2.0%', 'national'), row('Target margin', '15.0%', 'national'), row('IRR hurdle', '17.0%', 'national')]
+        }
+      ],
+      tableChips: ['Shaw + Ward 6', T('Feasibility value ≥ $1.2M', 'Total RLV ≥ $1.2M'), 'Midrise, Highrise', T('Return ≥ 17%', 'IRR ≥ 17%')],
+      sortLabel: { rlv: T('feasibility value', 'total RLV'), cost: 'total cost', cpu: 'cost per unit', noi: 'NOI', yoc: T('yield', 'YoC'), irr: T('return', 'IRR'), gsf: 'buildable SF' }[sortKey] + (sortDir < 0 ? ', high to low' : ', low to high'),
+      tableHead: [
+        { k: '', key: '', j: 'flex-start' }, { k: 'Parcel', key: '', j: 'flex-start' }, { k: 'Ward', key: '', j: 'flex-start' },
+        { k: T('Best build', 'Best program'), key: '', j: 'flex-start' },
+        { k: T('Total cost', 'Total dev cost'), key: 'cost', j: 'flex-end' }, { k: 'Cost / unit', key: 'cpu', j: 'flex-end' },
+        { k: 'NOI', key: 'noi', j: 'flex-end' }, { k: T('Feasibility value', 'Total RLV'), key: 'rlv', j: 'flex-end' },
+        { k: T('Yield', 'YoC'), key: 'yoc', j: 'flex-end' }, { k: T('Return', 'IRR'), key: 'irr', j: 'flex-end' },
+        { k: T('Buildable SF', 'Buildable GSF'), key: 'gsf', j: 'flex-start' }
+      ].map(h => ({
+        k: h.k, key: h.key, j: h.j, cur: h.key ? 'pointer' : 'default',
+        fg: h.key === sortKey ? '#1A1D1C' : '#8A8781',
+        arrow: h.key === sortKey ? (sortDir < 0 ? '▼' : '▲') : '',
+        onSort: h.key ? this.sort : undefined
+      })),
+      tableRows: scored.map(tRow),
+      compare: cmp,
+      compareRows: [
+        cRow(T('Feasibility value (RLV)', 'Total RLV'), fmtM(cd[0].p.rlv), fmtM(cd[1].p.rlv), fmtM(cd[2].p.rlv), true),
+        cRow(T('Value per unit', 'RLV / unit'), cd[0].pu, cd[1].pu, cd[2].pu, false),
+        cRow(T('Annual return (IRR)', 'Levered IRR'), cd[0].irr, cd[1].irr, cd[2].irr, true),
+        cRow(T('Income vs cost', 'Yield on cost'), cd[0].yoc, cd[1].yoc, cd[2].yoc, false),
+        cRow(T('Cash back on equity', 'Equity multiple'), '1.71×', '1.88×', '1.54×', false),
+        cRow(T('Yearly income (NOI)', 'Stabilized NOI'), cd[0].noi, cd[1].noi, cd[2].noi, true),
+        cRow(T('Total cost to build', 'Total dev cost'), cd[0].cost, cd[1].cost, cd[2].cost, false),
+        cRow(T('Cost per unit', 'Cost / unit'), cd[0].cpu, cd[1].cpu, cd[2].cpu, false),
+        cRow(T('Buildable floor area', 'Buildable GSF'), cd[0].gsf, cd[1].gsf, cd[2].gsf, false),
+        cRow(T('Best build', 'Best prototype'), cd[0].p.proto, cd[1].p.proto, cd[2].p.proto, false)
+      ].map((r, i) => Object.assign(r, { bg: r.hi ? '#F6FAF9' : (i % 2 ? '#FAF9F6' : '#fff') })),
+      lists: [
+        ['Shaw acquisitions', '7', true], ['Ward 5 industrial edge', '12', false], ['Historic — watch', '4', false], ['Passed on', '19', false]
+      ].map(([name, n, active]) => ({ name, n, bg: active ? '#F4F2ED' : 'transparent', fg: active ? '#1A1D1C' : '#5C5952', font: (active ? '600' : '400') + " 12.5px 'Public Sans',sans-serif" })),
+      listTotals: [
+        { k: 'Parcels', v: '7' }, { k: T('Combined value', 'Combined RLV'), v: '$31.2M' },
+        { k: T('Combined floor area', 'Combined GSF'), v: '186,400' }, { k: T('Median return', 'Median IRR'), v: '17.9%' }
+      ],
+      saved: savedCards
+    };
+  }
+}
+</script>
+</body>
+</html>

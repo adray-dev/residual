@@ -122,6 +122,10 @@ class Outputs:
     peak_equity: float | None
     confidence: float
     exit_value: float = 0.0     # stabilized gross sale value; used by solve_irr_rlv's upper bracket
+    noi: float = 0.0            # stabilized NOI, annual. Both tiers compute it to reach
+                                # exit_value and yield_on_cost; returning it lets the bake
+                                # persist it and the UI show "Yearly income (NOI)" without
+                                # back-solving it out of yield_on_cost * TDC.
     irr_target_unachievable: bool = False
 
 

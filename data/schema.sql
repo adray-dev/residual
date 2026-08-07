@@ -14,6 +14,14 @@ CREATE INDEX submarkets_geom_gix ON submarkets USING GIST (boundary);
 CREATE TABLE parcels (
   ssl TEXT PRIMARY KEY,
   parcel_geom GEOMETRY(MultiPolygon, 4326),
+  -- Stage D (v1.6): the UI is address-forward — six of the seven handoff screens lead
+  -- with a street address, and search accepts "address · parcel ID · ward". Both fields
+  -- ride on the Common Ownership Layer already loaded (PREMISEADD, NBHDNAME/SUBNBHD),
+  -- so this is two extra outFields, not a new dataset or a new spatial join.
+  -- NULLABLE on purpose: not every SSL has a premise address (vacant interior lots, ROW
+  -- slivers). Readers fall back to the parcel ID rather than rendering a blank label.
+  address TEXT,
+  neighborhood TEXT,       -- assessment neighbourhood, e.g. "Old City 2" / "Shaw"
   lot_area_sf DOUBLE PRECISION,
   zone_code TEXT,          -- NOT a hard FK (fix #1): a parcel in a not-yet-encoded
                            -- district must still load. The bake resolves an unencoded
@@ -29,6 +37,12 @@ CREATE TABLE parcels (
   is_historic BOOLEAN DEFAULT FALSE                 -- in a historic district (flagged, not scored)
 );
 CREATE INDEX parcels_geom_gix ON parcels USING GIST (parcel_geom);
+-- Typeahead for /parcels/search (Stage D): trigram over the free-text keys, btree over
+-- the low-cardinality neighbourhood used by the geography filter chips.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX parcels_address_trgm_idx ON parcels USING GIN (address gin_trgm_ops);
+CREATE INDEX parcels_ssl_trgm_idx ON parcels USING GIN (ssl gin_trgm_ops);
+CREATE INDEX parcels_neighborhood_idx ON parcels (neighborhood);
 
 CREATE TABLE zoning_rules (
   district_code TEXT PRIMARY KEY,
@@ -90,6 +104,22 @@ CREATE TABLE bake_results (
                                         -- objective. NULL when not 'scored' or gross_sf = 0.
   confidence DOUBLE PRECISION,
   binding_constraint TEXT,     -- for 'scored': far/height/stories; for others: the reason
+  -- Stage D (v1.6): the rest of the SCREENING tier, persisted for the same reason as the
+  -- two ranking columns above — `screening_rlv` already computes every one of these and
+  -- then throws them away, and the table view needs to SORT on them. Deriving them on read
+  -- would mean re-running the engine per visible page, which §9's "persisted, never derived
+  -- on read" rule exists to prevent. All NULL when status <> 'scored'.
+  -- NOT here: levered IRR. It does not exist in the screening tier at all (`Outputs.irr` is
+  -- None until `full_cashflow` runs), so the table's Return column is filled on demand.
+  noi DOUBLE PRECISION,                  -- stabilized NOI, annual
+  total_development_cost DOUBLE PRECISION,   -- screening TDC (excludes land)
+  yield_on_cost DOUBLE PRECISION,
+  profit_margin DOUBLE PRECISION,
+  exit_value DOUBLE PRECISION,
+  gross_sf DOUBLE PRECISION,
+  net_rentable_sf DOUBLE PRECISION,
+  unit_count INTEGER,          -- REPORTING ONLY (§3.1 fix #3); never drives revenue
+  floors INTEGER,
   computed_at TIMESTAMPTZ,
   PRIMARY KEY (ssl, prototype_id, computed_at)
 );
@@ -109,6 +139,20 @@ CREATE INDEX bake_rlv_total_idx ON bake_results (computed_at, rlv_total DESC);
 --   UPDATE bake_results SET rlv_total = screening_rlv WHERE rlv_total IS NULL;
 --   CREATE INDEX IF NOT EXISTS bake_rlv_total_idx
 --       ON bake_results (computed_at, rlv_total DESC);
+--
+-- MIGRATION NOTE (Stage D, v1.6). The nine screening columns are likewise unbackfillable —
+-- NOI, TDC, and the program shape were never persisted — so they are added empty and
+-- repopulated by re-running the bake. Same retention behaviour as above.
+--
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS noi DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS total_development_cost DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS yield_on_cost DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS profit_margin DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS exit_value DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS gross_sf DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS net_rentable_sf DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS unit_count INTEGER;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS floors INTEGER;
 
 CREATE TABLE assumption_sets (
   assumption_set_id TEXT PRIMARY KEY,
@@ -129,3 +173,22 @@ CREATE TABLE scenarios (
                                   -- flag + proposed refresh after N months. Deferred.)
   cashflow JSONB, outputs JSONB, saved_at TIMESTAMPTZ
 );
+
+-- Stage D (v1.6). Shortlists are pure user state: named collections of parcels, with no
+-- model output of their own. The 1f card metrics are read live from the latest bake for the
+-- member SSLs, so a shortlist never goes stale against a re-bake and never freezes a number.
+-- (Scenarios are the opposite by design — they DO freeze, via market_snapshot.)
+CREATE TABLE shortlists (
+  shortlist_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  user_id TEXT DEFAULT 'local',   -- matches scenarios; real auth later (SPEC §7.1)
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE shortlist_parcels (
+  shortlist_id TEXT REFERENCES shortlists(shortlist_id) ON DELETE CASCADE,
+  ssl TEXT REFERENCES parcels(ssl),
+  added_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (shortlist_id, ssl)
+);
+CREATE INDEX shortlist_parcels_ssl_idx ON shortlist_parcels (ssl);

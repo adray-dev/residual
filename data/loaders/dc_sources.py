@@ -43,6 +43,8 @@ HISTORIC_DISTRICTS_URL = f"{HISTORIC}/6"  # Historic Districts
 # --- fields the loaders read (schema-validation guard, SPEC §7.2) ------------
 PARCEL_FIELDS = [
     "SSL",          # Square-Suffix-Lot — the universal key
+    "PREMISEADD",   # premise address        -> address       (Stage D: UI is address-forward)
+    "NBHDNAME",     # assessment nbhd name   -> neighborhood  (SUBNBHD is a letter code, unused)
     "USECODE",      # -> land_use_code
     "PROPTYPE",
     "NEWLAND",      # assessed land value    -> land_value
@@ -59,6 +61,11 @@ CAMA_CONDOMINIUM_FIELDS = ["SSL", "LIVING_GBA", "USECODE"]
 ZONING_FIELDS = ["ZONING", "ZONING_LABEL"]
 WARD_FIELDS = ["WARD", "NAME"]
 HISTORIC_FIELDS = ["NAME", "LABEL"]
+
+# Attribute-only pull for the address backfill (`dc_addresses.py`). Same pinned layer as
+# PARCELS_URL, no geometry — so refreshing addresses never rewrites parcel_geom or
+# re-runs the spatial joins.
+ADDRESS_FIELDS = ["SSL", "PREMISEADD", "NBHDNAME"]
 
 # --- projections ------------------------------------------------------------
 WGS84 = "EPSG:4326"

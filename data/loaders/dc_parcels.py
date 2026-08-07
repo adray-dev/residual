@@ -15,6 +15,7 @@ import pandas as pd
 
 from data.loaders import dc_sources as src
 from data.loaders.arcgis import fetch_features, fetch_table
+from data.loaders.dc_addresses import derive_columns as derive_address_columns
 from data.loaders.dc_zoning import fetch_zoning_polygons
 from data.repositories import connection
 
@@ -203,6 +204,11 @@ def apply_cama(
 
     # `merge` returns a fresh RangeIndex, so every derived column below must be computed
     # from the merged frame — never from a Series built before the merge.
+    # Address and neighbourhood come off the same layer (Stage D). Derived before the
+    # CAMA merge, via the shared rule in `dc_addresses`, so a full re-pull and the
+    # standalone backfill produce identical values.
+    parcels[["address", "neighborhood"]] = derive_address_columns(parcels)
+
     parcels = parcels.merge(cama, on="ssl", how="left", suffixes=("", "_cama"))
     parcels["existing_building_sf"] = parcels["existing_building_sf"].fillna(0.0)
     report.with_cama = int(parcels["cama_source"].notna().sum())
@@ -353,7 +359,8 @@ def join_historic(
 # ---------------------------------------------------------------------------
 _STAGE_DDL = """
 CREATE TEMP TABLE parcels_stage (
-    ssl TEXT, geom_wkt TEXT, lot_area_sf DOUBLE PRECISION, zone_code TEXT,
+    ssl TEXT, geom_wkt TEXT, address TEXT, neighborhood TEXT,
+    lot_area_sf DOUBLE PRECISION, zone_code TEXT,
     submarket_id TEXT, land_value DOUBLE PRECISION, improvement_value DOUBLE PRECISION,
     improvement_ratio DOUBLE PRECISION, land_use_code TEXT,
     existing_building_sf DOUBLE PRECISION, is_exempt BOOLEAN, is_historic BOOLEAN
@@ -362,16 +369,18 @@ CREATE TEMP TABLE parcels_stage (
 
 _STAGE_TO_PARCELS = """
 INSERT INTO parcels (
-    ssl, parcel_geom, lot_area_sf, zone_code, submarket_id, land_value,
-    improvement_value, improvement_ratio, land_use_code, existing_building_sf,
-    is_exempt, is_historic
+    ssl, parcel_geom, address, neighborhood, lot_area_sf, zone_code, submarket_id,
+    land_value, improvement_value, improvement_ratio, land_use_code,
+    existing_building_sf, is_exempt, is_historic
 )
-SELECT ssl, ST_Multi(ST_GeomFromText(geom_wkt, 4326)), lot_area_sf, zone_code,
-       submarket_id, land_value, improvement_value, improvement_ratio, land_use_code,
-       existing_building_sf, is_exempt, is_historic
+SELECT ssl, ST_Multi(ST_GeomFromText(geom_wkt, 4326)), address, neighborhood,
+       lot_area_sf, zone_code, submarket_id, land_value, improvement_value,
+       improvement_ratio, land_use_code, existing_building_sf, is_exempt, is_historic
 FROM parcels_stage
 ON CONFLICT (ssl) DO UPDATE SET
     parcel_geom = EXCLUDED.parcel_geom,
+    address = EXCLUDED.address,
+    neighborhood = EXCLUDED.neighborhood,
     lot_area_sf = EXCLUDED.lot_area_sf,
     zone_code = EXCLUDED.zone_code,
     submarket_id = EXCLUDED.submarket_id,
@@ -385,9 +394,9 @@ ON CONFLICT (ssl) DO UPDATE SET
 """
 
 _COPY_COLUMNS = [
-    "ssl", "geom_wkt", "lot_area_sf", "zone_code", "submarket_id", "land_value",
-    "improvement_value", "improvement_ratio", "land_use_code",
-    "existing_building_sf", "is_exempt", "is_historic",
+    "ssl", "geom_wkt", "address", "neighborhood", "lot_area_sf", "zone_code",
+    "submarket_id", "land_value", "improvement_value", "improvement_ratio",
+    "land_use_code", "existing_building_sf", "is_exempt", "is_historic",
 ]
 
 
@@ -467,9 +476,9 @@ def build_parcels() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, LoadReport]:
     )
 
     keep = [
-        "ssl", "geometry", "lot_area_sf", "zone_code", "submarket_id", "land_value",
-        "improvement_value", "improvement_ratio", "land_use_code",
-        "existing_building_sf", "is_exempt", "is_historic",
+        "ssl", "geometry", "address", "neighborhood", "lot_area_sf", "zone_code",
+        "submarket_id", "land_value", "improvement_value", "improvement_ratio",
+        "land_use_code", "existing_building_sf", "is_exempt", "is_historic",
     ]
     return parcels[keep], wards, report
 

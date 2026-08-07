@@ -110,6 +110,18 @@ class Candidate:
     # `rlv_per_buildable_sf` is the selectable alternate.
     rlv_total: float
     rlv_per_buildable_sf: float
+    # The rest of the screening tier (v1.6). `screening_rlv` computes every one of these on
+    # the way to the RLV and used to discard them; the table view sorts on them, so they are
+    # persisted for the same reason the two ranking columns are (SPEC §9). Levered IRR is
+    # absent on purpose — it does not exist in this tier.
+    noi: float
+    total_development_cost: float
+    yield_on_cost: float
+    profit_margin: float
+    exit_value: float
+    net_rentable_sf: float
+    unit_count: int
+    floors: int
 
     @property
     def objective(self) -> float:
@@ -150,6 +162,14 @@ def evaluate_parcel(
                 gross_sf=program.gross_sf,
                 rlv_total=out.screening_rlv,
                 rlv_per_buildable_sf=out.screening_rlv / program.gross_sf,
+                noi=out.noi,
+                total_development_cost=out.total_development_cost,
+                yield_on_cost=out.yield_on_cost,
+                profit_margin=out.profit_margin,
+                exit_value=out.exit_value,
+                net_rentable_sf=program.net_rentable_sf,
+                unit_count=program.unit_count,
+                floors=program.floors,
             )
         )
     return candidates
@@ -209,6 +229,17 @@ def _status_row(parcel: Parcel, status: str, reason: str | None, computed_at: da
         "rlv_per_buildable_sf": None,
         "confidence": None,
         "binding_constraint": reason,
+        # A status row has no program and no pro forma: every screening column is NULL, not
+        # zero. Zero would sort as a real value and read as "$0 of NOI" on the table.
+        "noi": None,
+        "total_development_cost": None,
+        "yield_on_cost": None,
+        "profit_margin": None,
+        "exit_value": None,
+        "gross_sf": None,
+        "net_rentable_sf": None,
+        "unit_count": None,
+        "floors": None,
         "computed_at": computed_at,
     }
 
@@ -257,6 +288,15 @@ def rows_for_parcel(
             "rlv_per_buildable_sf": c.rlv_per_buildable_sf,
             "confidence": c.confidence,
             "binding_constraint": c.binding_constraint,
+            "noi": c.noi,
+            "total_development_cost": c.total_development_cost,
+            "yield_on_cost": c.yield_on_cost,
+            "profit_margin": c.profit_margin,
+            "exit_value": c.exit_value,
+            "gross_sf": c.gross_sf,
+            "net_rentable_sf": c.net_rentable_sf,
+            "unit_count": c.unit_count,
+            "floors": c.floors,
             "computed_at": computed_at,
         }
         for c in candidates
