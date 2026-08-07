@@ -244,6 +244,16 @@ them, so adding them *lowers* every parcel's confidence (0.0625 → 0.0577).
 | selling_cost_pct | 2.0% | national |
 | target_developer_margin | 15% (used for margin-based screening RLV) | national |
 | discount_rate (for NPV checks) | 10% | national |
+| irr_hurdle (for IRR-based full RLV) | 17% | national |
+
+> **`irr_hurdle` added in v1.6 (Stage D).** `solve_irr_rlv` (§6.8) has always taken the
+> hurdle as a caller argument with no default, and §2.6 defined none — fine while the only
+> caller was a test passing an explicit value, but the API must supply one on every full
+> underwrite. 17% is adopted from the design handoff, which assumes it in two places (the
+> inputs modal's Exit & return group and the map's "Annual return ≥" filter). It is
+> **not** measured from anything and is tagged `national` accordingly, so confidence
+> reports it as un-tailored. Do not conflate it with `discount_rate`: a discount rate for
+> NPV is not a developer's required return, and the two are used in different tiers.
 
 ### 2.7 Envelope defaults
 | Field | Value | Provenance |

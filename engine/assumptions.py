@@ -33,8 +33,15 @@ DEFAULT_ASSUMPTIONS = Assumptions(
     exit={
         "exit_cap_rate": 0.055,             # submarket MarketData overrides this
         "selling_cost_pct": 0.02,
-        "target_developer_margin": 0.15,
-        "discount_rate": 0.10,
+        "target_developer_margin": 0.15,    # margin-based screening RLV (tier 1)
+        "discount_rate": 0.10,              # NPV checks only — NOT the return hurdle
+        # IRR-based full RLV (tier 2): the levered return `solve_irr_rlv` solves land value
+        # against. Distinct from `discount_rate` — a discount rate for NPV is not a
+        # developer's required return. SPEC §2.6 carried no hurdle, and `solve_irr_rlv` has
+        # always taken it as a caller argument with no default, so the API had nothing to
+        # pass; 17.0% is adopted from the design handoff (v1.6). Tagged `national` like
+        # every other un-sourced input.
+        "irr_hurdle": 0.17,
     },
     envelope={
         "floor_to_floor_residential_ft": 10,
@@ -63,6 +70,11 @@ PROVENANCE = {
     "perm_amortization_years": "national", "perm_min_dscr": "national",
     "exit_cap_rate": "national", "selling_cost_pct": "national",
     "target_developer_margin": "national", "discount_rate": "national",
+    # Counted here for the same reason the debt inputs are: PROVENANCE scores the whole
+    # assumption set, not the per-tier consumed subset (the screening tier is unlevered yet
+    # construction_ltc/perm_ltv are already tagged). Adding it dilutes confidence slightly,
+    # which is honest — it is one more number nothing sourced.
+    "irr_hurdle": "national",
     "hard_cost_psf": "national",   # promoted only by a MarketData row that sources cost
     # v1.4 product-type dimension (§2.4). Tagged "national" deliberately: unlike
     # rent_psf/exit_cap_rate, these are NOT supplied by a MarketData row and are not

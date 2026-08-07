@@ -482,13 +482,22 @@ def test_demolition_toggle_lowers_rlv_by_demo_cost_plus_soft_and_contingency():
 
 
 def test_confidence_is_provenance_weighted():
-    # v1.5: all 26 PROVENANCE entries are "national" at baseline, including the three a
+    # v1.5: every PROVENANCE entry is "national" at baseline, including the three a
     # MarketData row can supply. With no row — or a fallback row that tailors nothing —
     # every input really is a national default, so the honest score is 0.0.
-    assert len(PROVENANCE) == 26
+    #
+    # The size is pinned because every input dilutes confidence on every parcel in the
+    # city: changing it is allowed, but it needs a re-bake and a deliberate edit here
+    # rather than passing silently. 27 as of v1.6 (`irr_hurdle` added, §2.6).
+    assert len(PROVENANCE) == 27
     assert set(PROVENANCE.values()) == {"national"}
     assert score_confidence(PROVENANCE) == 0.0
     assert score_confidence(PROVENANCE, _market()) == 0.0
+    # The three a MarketData row may promote must be present to be promotable.
+    assert {"rent_psf_residential_monthly", "exit_cap_rate", "hard_cost_psf"} <= set(PROVENANCE)
+    # Both return figures exist and are distinct concepts (§2.6): NPV discount rate vs.
+    # the levered hurdle `solve_irr_rlv` solves against.
+    assert "discount_rate" in PROVENANCE and "irr_hurdle" in PROVENANCE
 
 
 def test_confidence_varies_with_what_the_market_row_actually_sources():
@@ -507,8 +516,12 @@ def test_confidence_varies_with_what_the_market_row_actually_sources():
         "exit_cap_rate": "national",
         "hard_cost_psf": "national",
     }
-    assert score_confidence(PROVENANCE, fully_sourced) == pytest.approx(1.0 / 26)
-    assert score_confidence(PROVENANCE, rent_only) == pytest.approx(0.5 / 26)
+    # Denominator is the size of the input set, not a literal: adding a genuine input is a
+    # normal event and should fail `test_provenance_input_set_is_pinned` (which exists to
+    # make that visible), not these two, which are about sourcing behaviour.
+    n = len(PROVENANCE)
+    assert score_confidence(PROVENANCE, fully_sourced) == pytest.approx(1.0 / n)
+    assert score_confidence(PROVENANCE, rent_only) == pytest.approx(0.5 / n)
     assert score_confidence(PROVENANCE, fully_sourced) > score_confidence(
         PROVENANCE, rent_only
     ) > score_confidence(PROVENANCE, _market())
@@ -520,7 +533,7 @@ def test_market_row_can_only_raise_an_input_not_lower_it():
     upgraded = dict(PROVENANCE, rent_psf_residential_monthly="local")
     downgrader = _market()
     downgrader.input_provenance = {"rent_psf_residential_monthly": "national"}
-    assert score_confidence(upgraded, downgrader) == pytest.approx(1.0 / 26)
+    assert score_confidence(upgraded, downgrader) == pytest.approx(1.0 / len(PROVENANCE))
 
 
 # ---------------------------------------------------------------------------
