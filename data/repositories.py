@@ -51,6 +51,12 @@ _PARCEL_COLS = """
     improvement_ratio, land_use_code, existing_building_sf, is_exempt, is_historic
 """
 
+# `address` and `neighborhood` are DISPLAY fields, not model inputs, so they are read
+# separately and never reach `Parcel` — SPEC §3.1 pins that dataclass's fields, and the
+# engine has no business knowing a street name. Readers that render a label select this
+# instead of `_PARCEL_COLS`.
+_PARCEL_DISPLAY_COLS = _PARCEL_COLS.rstrip() + ", address, neighborhood\n"
+
 
 def base_district(zone_code: str | None) -> str | None:
     """The base district of a zone code, with any overlay tag stripped.
@@ -172,6 +178,22 @@ def get_parcel(conn, ssl: str) -> Parcel | None:
         cur.execute(f"SELECT {_PARCEL_COLS} FROM parcels WHERE ssl = %s", (ssl,))
         row = cur.fetchone()
     return _to_parcel(row) if row else None
+
+
+def get_parcel_record(conn, ssl: str) -> dict | None:
+    """The raw parcels row including the display fields (address, neighbourhood).
+
+    The API needs both the engine's `Parcel` and the label in one round trip, so it reads
+    this and calls `to_parcel(row)` rather than querying twice.
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT {_PARCEL_DISPLAY_COLS} FROM parcels WHERE ssl = %s", (ssl,))
+        return cur.fetchone()
+
+
+# Public alias: callers holding a row from `get_parcel_record` build the engine dataclass
+# from it without a second query.
+to_parcel = _to_parcel
 
 
 def parcels_in_bbox(conn, bounds: tuple[float, float, float, float]) -> list[Parcel]:
@@ -432,6 +454,222 @@ def bake_rows_for_ssl(conn, ssl: str, computed_at: datetime | None = None) -> li
         return cur.fetchall()
 
 
+# ---------------------------------------------------------------------------
+# Stage D reads (SPEC §10)
+# ---------------------------------------------------------------------------
+# Columns the table view may sort on. A whitelist because the value is interpolated into
+# SQL — never accept a caller's string here. Keys are the wire names; values are the
+# qualified columns. Levered IRR is absent on purpose: it does not exist in the screening
+# tier (SPEC §9), so it cannot be an ORDER BY.
+SORTABLE = {
+    "rlv_total": "b.rlv_total",
+    "rlv_per_buildable_sf": "b.rlv_per_buildable_sf",
+    "screening_rlv": "b.screening_rlv",
+    "feasibility_gap": "b.feasibility_gap",
+    "noi": "b.noi",
+    "total_development_cost": "b.total_development_cost",
+    "yield_on_cost": "b.yield_on_cost",
+    "profit_margin": "b.profit_margin",
+    "exit_value": "b.exit_value",
+    "gross_sf": "b.gross_sf",
+    "net_rentable_sf": "b.net_rentable_sf",
+    "unit_count": "b.unit_count",
+    "floors": "b.floors",
+    "confidence": "b.confidence",
+    "lot_area_sf": "p.lot_area_sf",
+    "land_value": "p.land_value",
+    "address": "p.address",
+    "parcel_id": "b.ssl",
+}
+
+_MAP_SELECT = """
+    b.ssl, b.prototype_id, b.status, b.screening_rlv, b.feasibility_gap,
+    b.rlv_total, b.rlv_per_buildable_sf, b.confidence, b.binding_constraint,
+    b.noi, b.total_development_cost, b.yield_on_cost, b.profit_margin,
+    b.exit_value, b.gross_sf, b.net_rentable_sf, b.unit_count, b.floors,
+    p.lot_area_sf, p.submarket_id, p.zone_code, p.land_value,
+    p.existing_building_sf, p.address, p.neighborhood
+"""
+
+
+def _map_where(
+    computed_at: datetime | None,
+    bounds: tuple[float, float, float, float] | None,
+    filters: Mapping[str, Any],
+) -> tuple[list[str], list[Any]]:
+    """Shared WHERE builder for the count and the page, so the two cannot disagree."""
+    where = [f"b.computed_at = COALESCE(%s, {LATEST_BATCH})", "b.is_best"]
+    params: list[Any] = [computed_at]
+
+    if bounds is not None:
+        where.append("p.parcel_geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)")
+        params.extend(bounds)
+    if filters.get("drawn_polygon"):
+        # ST_Intersects, not &&: a drawn area is an explicit selection, so it should mean
+        # the shape rather than the shape's bounding box.
+        where.append("ST_Intersects(p.parcel_geom, ST_GeomFromGeoJSON(%s))")
+        params.append(json.dumps(filters["drawn_polygon"]))
+    if filters.get("statuses"):
+        where.append("b.status = ANY(%s)")
+        params.append(list(filters["statuses"]))
+    if filters.get("wards"):
+        where.append("p.submarket_id = ANY(%s)")
+        params.append(list(filters["wards"]))
+    if filters.get("neighborhoods"):
+        where.append("p.neighborhood = ANY(%s)")
+        params.append(list(filters["neighborhoods"]))
+    if filters.get("prototypes"):
+        where.append("b.prototype_id = ANY(%s)")
+        params.append(list(filters["prototypes"]))
+    if filters.get("rlv_min") is not None:
+        where.append("b.rlv_total >= %s")
+        params.append(filters["rlv_min"])
+    if filters.get("rlv_max") is not None:
+        where.append("b.rlv_total <= %s")
+        params.append(filters["rlv_max"])
+    if filters.get("min_confidence") is not None:
+        where.append("b.confidence >= %s")
+        params.append(filters["min_confidence"])
+    return where, params
+
+
+def map_query(
+    conn,
+    computed_at: datetime | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
+    filters: Mapping[str, Any] | None = None,
+    sort_key: str = DEFAULT_MAP_OBJECTIVE,
+    sort_dir: str = "desc",
+    limit: int = 200,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    """The table/compare read (SPEC §10). Returns (page, total_matching).
+
+    Reads precomputed `bake_results` and NEVER runs the engine — that is the whole point of
+    the two-tier split. Scoped to one batch AND `is_best`, so exactly one row per parcel.
+
+    `sort_key` is looked up in the SORTABLE whitelist; anything else falls back to the
+    default objective rather than reaching SQL.
+    """
+    filters = filters or {}
+    where, params = _map_where(computed_at, bounds, filters)
+    clause = " AND ".join(where)
+
+    order_col = SORTABLE.get(sort_key, SORTABLE[DEFAULT_MAP_OBJECTIVE])
+    direction = "ASC" if str(sort_dir).lower() == "asc" else "DESC"
+
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT count(*) AS n FROM bake_results b JOIN parcels p USING (ssl)
+                WHERE {clause}""",
+            params,
+        )
+        total = cur.fetchone()["n"]
+
+        cur.execute(
+            f"""SELECT {_MAP_SELECT}
+                FROM bake_results b JOIN parcels p USING (ssl)
+                WHERE {clause}
+                ORDER BY {order_col} {direction} NULLS LAST, b.ssl
+                LIMIT %s OFFSET %s""",
+            [*params, limit, offset],
+        )
+        return cur.fetchall(), total
+
+
+def objective_ramp(
+    conn, objective: str = DEFAULT_MAP_OBJECTIVE, computed_at: datetime | None = None
+) -> dict:
+    """Quantile breakpoints for the map's diverging value ramp.
+
+    The handoff's 8-stop teal ramp assumes all-positive values, but 56% of scored DC
+    parcels have a negative feasibility value and the tails run to ±$80M+, so a linear
+    scale collapses the middle. The ramp therefore diverges at zero and is quantile-binned
+    WITHIN each arm — computed here, once per bake, rather than by the client.
+
+    Returns ascending break lists for each arm. Both arms get 4 bins, so the two together
+    reproduce the handoff's 8 stops.
+    """
+    column = MAP_OBJECTIVES.get(objective, MAP_OBJECTIVES[DEFAULT_MAP_OBJECTIVE])
+    quartiles = [0.25, 0.5, 0.75]
+
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT
+                    min({column}) AS lo,
+                    max({column}) AS hi,
+                    count(*) FILTER (WHERE {column} < 0) AS neg_n,
+                    count(*) FILTER (WHERE {column} >= 0) AS pos_n,
+                    percentile_cont(%s) WITHIN GROUP (ORDER BY {column})
+                        FILTER (WHERE {column} < 0) AS neg_breaks,
+                    percentile_cont(%s) WITHIN GROUP (ORDER BY {column})
+                        FILTER (WHERE {column} >= 0) AS pos_breaks
+                FROM bake_results b
+                WHERE b.computed_at = COALESCE(%s, {LATEST_BATCH})
+                  AND b.is_best AND b.status = 'scored' AND {column} IS NOT NULL""",
+            (quartiles, quartiles, computed_at),
+        )
+        row = cur.fetchone()
+
+    return {
+        "objective": objective,
+        "min": row["lo"],
+        "max": row["hi"],
+        "negative_breaks": list(row["neg_breaks"] or []),
+        "positive_breaks": list(row["pos_breaks"] or []),
+        "negative_count": row["neg_n"] or 0,
+        "positive_count": row["pos_n"] or 0,
+    }
+
+
+def list_submarkets(conn) -> list[dict]:
+    with conn.cursor() as cur:
+        cur.execute("SELECT submarket_id, name FROM submarkets ORDER BY submarket_id")
+        return cur.fetchall()
+
+
+def list_neighborhoods(conn, min_parcels: int = 25) -> list[str]:
+    """Neighbourhood names for the geography filter chips.
+
+    Thresholded because the assessment layer carries a long tail of near-empty names that
+    would make the filter useless as a picker.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT neighborhood FROM parcels
+               WHERE neighborhood IS NOT NULL
+               GROUP BY neighborhood HAVING count(*) >= %s
+               ORDER BY neighborhood""",
+            (min_parcels,),
+        )
+        return [r["neighborhood"] for r in cur.fetchall()]
+
+
+def search_parcels(conn, q: str, limit: int = 10) -> list[dict]:
+    """Typeahead over address, parcel ID, ward and neighbourhood (the handoff's hint text).
+
+    Prefix matches rank above interior matches so typing a house number behaves.
+    """
+    term = (q or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    prefix = f"{term}%"
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT p.ssl, p.address, p.neighborhood, p.submarket_id, b.status
+               FROM parcels p
+               LEFT JOIN bake_results b
+                 ON b.ssl = p.ssl AND b.is_best
+                AND b.computed_at = (SELECT max(computed_at) FROM bake_results)
+               WHERE p.address ILIKE %s OR p.ssl ILIKE %s OR p.neighborhood ILIKE %s
+               ORDER BY (p.address ILIKE %s) DESC, (p.ssl ILIKE %s) DESC, p.address, p.ssl
+               LIMIT %s""",
+            (like, like, like, prefix, prefix, limit),
+        )
+        return cur.fetchall()
+
+
 def prune_bake_batches(conn, keep: int = 2) -> int:
     """Delete all but the most recent `keep` batches (SPEC §9 batch retention)."""
     with conn.cursor() as cur:
@@ -491,7 +729,7 @@ def latest_bake_for_map(
                        b.noi, b.total_development_cost, b.yield_on_cost, b.profit_margin,
                        b.exit_value, b.gross_sf, b.net_rentable_sf, b.unit_count, b.floors,
                        p.lot_area_sf, p.submarket_id, p.zone_code, p.land_value,
-                       p.existing_building_sf
+                       p.existing_building_sf, p.address, p.neighborhood
                 FROM bake_results b JOIN parcels p USING (ssl)
                 WHERE {' AND '.join(where)}
                 ORDER BY {order} DESC NULLS LAST, b.ssl""",

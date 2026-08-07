@@ -21,9 +21,11 @@ data = [
 api = [
   "fastapi>=0.110",
   "uvicorn>=0.29",
+  "psycopg-pool>=3.2",
 ]
 dev = [
   "pytest>=8.0",
+  "httpx>=0.27",          # fastapi.testclient
   "feasibility[data,api]",
 ]
 
