@@ -33,6 +33,19 @@ NONE_PROTOTYPE = "__none__"   # bake_results sentinel for status rows (SPEC §7.
 # resolves to a half-written one.
 LATEST_BATCH = "(SELECT max(computed_at) FROM bake_results)"
 
+# The map's selectable objectives (SPEC §9/§10). Every one is a STORED bake_results column:
+# the read path sorts, it never divides. `rlv_total` is the default — RLV/SF collapses to
+# roughly a constant per zone/prototype/submarket, so coloring on it reads as a zoning map,
+# while total RLV actually varies parcel to parcel. `is_best` is pinned to the same default
+# objective at bake time, so the map colors the measure the bake optimized.
+# Values are interpolated into SQL: this dict is the whitelist, never caller input.
+MAP_OBJECTIVES = {
+    "rlv_total": "b.rlv_total",
+    "rlv_per_buildable_sf": "b.rlv_per_buildable_sf",
+    "gap": "b.feasibility_gap",
+}
+DEFAULT_MAP_OBJECTIVE = "rlv_total"
+
 _PARCEL_COLS = """
     ssl, lot_area_sf, zone_code, submarket_id, land_value, improvement_value,
     improvement_ratio, land_use_code, existing_building_sf, is_exempt, is_historic
@@ -261,17 +274,23 @@ def get_default_assumption_set(conn) -> Assumptions | None:
 _BAKE_INSERT = """
 INSERT INTO bake_results (
     ssl, prototype_id, is_best, status, screening_rlv, feasibility_gap,
-    confidence, binding_constraint, computed_at
+    rlv_total, rlv_per_buildable_sf, confidence, binding_constraint, computed_at
 ) VALUES (
     %(ssl)s, %(prototype_id)s, %(is_best)s, %(status)s, %(screening_rlv)s,
-    %(feasibility_gap)s, %(confidence)s, %(binding_constraint)s, %(computed_at)s
+    %(feasibility_gap)s, %(rlv_total)s, %(rlv_per_buildable_sf)s,
+    %(confidence)s, %(binding_constraint)s, %(computed_at)s
 )
 ON CONFLICT (ssl, prototype_id, computed_at) DO NOTHING
 """
 
 
 def write_bake_results(conn, rows: Iterable[dict]) -> int:
-    """Append bake rows. `prototype_id` defaults to the '__none__' sentinel (SPEC §7.1)."""
+    """Append bake rows. `prototype_id` defaults to the '__none__' sentinel (SPEC §7.1).
+
+    Both ranking metrics are written by the bake, never derived on read. `rlv_total`
+    defaults to `screening_rlv` (they are the same number under two names); status rows
+    leave both NULL.
+    """
     params = [
         {
             "ssl": r["ssl"],
@@ -280,6 +299,8 @@ def write_bake_results(conn, rows: Iterable[dict]) -> int:
             "status": r["status"],
             "screening_rlv": r.get("screening_rlv"),
             "feasibility_gap": r.get("feasibility_gap"),
+            "rlv_total": r.get("rlv_total", r.get("screening_rlv")),
+            "rlv_per_buildable_sf": r.get("rlv_per_buildable_sf"),
             "confidence": r.get("confidence"),
             "binding_constraint": r.get("binding_constraint"),
             "computed_at": r["computed_at"],
@@ -360,13 +381,15 @@ def prune_bake_batches(conn, keep: int = 2) -> int:
 def latest_bake_for_map(
     conn,
     bounds: tuple[float, float, float, float] | None = None,
-    objective: str = "rlv_per_sf",
+    objective: str = DEFAULT_MAP_OBJECTIVE,
     filters: dict[str, Any] | None = None,
 ) -> list[dict]:
     """Best-per-parcel rows from the latest batch, for the map.
 
-    `objective` picks the sort measure only — `is_best` is pinned to RLV/SF at bake
-    time (SPEC §9). `filters` accepts `status`, `min_confidence`, `submarket_id`.
+    `objective` picks the sort measure, and every option is a STORED column — the read
+    path never divides (SPEC §9). It defaults to `rlv_total`, which is also the objective
+    `is_best` is pinned to at bake time, so the map colors the measure the bake optimized.
+    `filters` accepts `status`, `min_confidence`, `submarket_id`.
     """
     filters = filters or {}
     # Scoped to the latest batch AND is_best: exactly one row per parcel (SPEC §9).
@@ -386,20 +409,16 @@ def latest_bake_for_map(
         where.append("b.confidence >= %s")
         params.append(filters["min_confidence"])
 
-    order = {
-        "rlv_per_sf": "b.screening_rlv / NULLIF(p.lot_area_sf, 0)",
-        "rlv": "b.screening_rlv",
-        "gap": "b.feasibility_gap",
-    }.get(objective, "b.screening_rlv / NULLIF(p.lot_area_sf, 0)")
+    order = MAP_OBJECTIVES.get(objective, MAP_OBJECTIVES[DEFAULT_MAP_OBJECTIVE])
 
     with conn.cursor() as cur:
         cur.execute(
             f"""SELECT b.ssl, b.prototype_id, b.status, b.screening_rlv, b.feasibility_gap,
-                       b.confidence, b.binding_constraint, p.lot_area_sf, p.submarket_id,
-                       b.screening_rlv / NULLIF(p.lot_area_sf, 0) AS rlv_per_sf
+                       b.rlv_total, b.rlv_per_buildable_sf,
+                       b.confidence, b.binding_constraint, p.lot_area_sf, p.submarket_id
                 FROM bake_results b JOIN parcels p USING (ssl)
                 WHERE {' AND '.join(where)}
-                ORDER BY {order} DESC NULLS LAST""",
+                ORDER BY {order} DESC NULLS LAST, b.ssl""",
             params,
         )
         return cur.fetchall()

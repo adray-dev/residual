@@ -8,3 +8,4 @@ node_modules/
 dist/
 *.egg-info/
 .claude/settings.local.json
+.DS_Store

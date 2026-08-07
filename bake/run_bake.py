@@ -104,7 +104,16 @@ class Candidate:
     confidence: float
     binding_constraint: str
     gross_sf: float
-    objective: float   # RLV per buildable SF — the ONE pinned is_best objective (§3.4, §9)
+    # Both ranking metrics are computed here and persisted, so no reader ever divides
+    # (§9). `rlv_total` is the ONE pinned is_best objective and the map default;
+    # `rlv_per_buildable_sf` is the selectable alternate.
+    rlv_total: float
+    rlv_per_buildable_sf: float
+
+    @property
+    def objective(self) -> float:
+        """The pinned is_best / default-map objective (SPEC §9): total RLV."""
+        return self.rlv_total
 
 
 def evaluate_parcel(
@@ -129,7 +138,7 @@ def evaluate_parcel(
         out.confidence = score_confidence(PROVENANCE, market)
 
         if program.gross_sf <= 0:
-            continue          # nothing buildable — the objective would be undefined
+            continue          # nothing buildable — RLV per buildable SF would be undefined
         candidates.append(
             Candidate(
                 prototype_id=proto.prototype_id,
@@ -138,7 +147,8 @@ def evaluate_parcel(
                 confidence=out.confidence,
                 binding_constraint=envelope.binding_constraint,
                 gross_sf=program.gross_sf,
-                objective=out.screening_rlv / program.gross_sf,
+                rlv_total=out.screening_rlv,
+                rlv_per_buildable_sf=out.screening_rlv / program.gross_sf,
             )
         )
     return candidates
@@ -149,7 +159,11 @@ def select_best_with_tie_margin(
     prior_best_prototype_id: str | None,
     margin: float = TIE_MARGIN,
 ) -> Candidate:
-    """Pick the `is_best` row on RLV-per-buildable-SF, with hysteresis vs. the prior batch.
+    """Pick the `is_best` row on total RLV, with hysteresis vs. the prior batch.
+
+    Total RLV is the pinned objective and the map's default coloring, so the flagged
+    program is the one the map's color is measuring (SPEC §9). RLV per buildable SF is
+    persisted alongside it as the selectable alternate, but never drives this flag.
 
     The incumbent (last bake's best prototype for this parcel) keeps the flag unless a
     challenger beats it by more than `margin` — this stops the recommended program flipping
@@ -190,6 +204,8 @@ def _status_row(parcel: Parcel, status: str, reason: str | None, computed_at: da
         "status": status,
         "screening_rlv": None,
         "feasibility_gap": None,
+        "rlv_total": None,
+        "rlv_per_buildable_sf": None,
         "confidence": None,
         "binding_constraint": reason,
         "computed_at": computed_at,
@@ -234,6 +250,8 @@ def rows_for_parcel(
             "status": STATUS_SCORED,
             "screening_rlv": c.screening_rlv,
             "feasibility_gap": c.feasibility_gap,
+            "rlv_total": c.rlv_total,
+            "rlv_per_buildable_sf": c.rlv_per_buildable_sf,
             "confidence": c.confidence,
             "binding_constraint": c.binding_constraint,
             "computed_at": computed_at,

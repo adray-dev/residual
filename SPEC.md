@@ -61,6 +61,21 @@ moving on. Build Stage A first and prove it with `pytest` before touching data.
 > - Demolition (toggle on) is spent in the first construction month.
 > - `is_best` pinned to the RLV-per-buildable-SF objective.
 
+> **Revision v1.3.1 — ranking metrics persisted; default objective is total RLV.**
+> (Supersedes the v1.3 line above.) From the Stage C baseline review:
+> - `bake_results` gains **`rlv_total`** (= `screening_rlv`) and **`rlv_per_buildable_sf`**
+>   (= `screening_rlv / program.gross_sf`), both written by the bake. `gross_sf` is not a
+>   column, so RLV/SF is only computable at bake time; readers ORDER BY the stored column
+>   and **never divide at read time** — in particular never by `lot_area_sf`, which was a
+>   third measure, agreeing with neither the bake's objective nor the intended one.
+> - **Total RLV is the default map coloring/sort objective**, and `is_best` is repinned to
+>   it, so the map colors the measure the bake optimized. RLV/SF is demoted to a selectable
+>   alternate: it is near-constant within a zone (roughly a constant per zone/prototype/
+>   submarket), so coloring on it reproduces the zoning map, while total RLV varies parcel
+>   to parcel.
+> - Migration: the two columns are added empty; `rlv_per_buildable_sf` cannot be backfilled,
+>   so an existing database is repopulated by re-running the bake (see `data/schema.sql`).
+
 ---
 
 ## 0. Product in one paragraph
@@ -807,6 +822,9 @@ CREATE TABLE bake_results (
   status TEXT NOT NULL,         -- 'scored' | 'infeasible' | 'zone_not_encoded' | 'exempt' | 'historic'
   screening_rlv DOUBLE PRECISION,   -- NULL when not 'scored'
   feasibility_gap DOUBLE PRECISION, -- NULL when not 'scored'
+  -- v1.3.1: both ranking objectives are STORED, so no reader divides (§9).
+  rlv_total DOUBLE PRECISION,            -- = screening_rlv; DEFAULT map objective + is_best
+  rlv_per_buildable_sf DOUBLE PRECISION, -- = screening_rlv / gross_sf; alternate objective
   confidence DOUBLE PRECISION,
   binding_constraint TEXT,     -- for 'scored': far/height/stories; for others: the reason
   computed_at TIMESTAMPTZ,
@@ -814,6 +832,7 @@ CREATE TABLE bake_results (
 );
 CREATE INDEX bake_best_idx ON bake_results (is_best, computed_at);
 CREATE INDEX bake_status_idx ON bake_results (status, computed_at);
+CREATE INDEX bake_rlv_total_idx ON bake_results (computed_at, rlv_total DESC);
 
 CREATE TABLE assumption_sets (
   assumption_set_id TEXT PRIMARY KEY,
@@ -992,10 +1011,11 @@ for each parcel (single process, v1):
             continue                          # this prototype doesn't fit; try the next
 
     if results:
-        # is_best is computed on ONE pinned objective: RLV per buildable SF (the default
-        # map objective). Note: gap ordering is identical to RLV ordering within a parcel
-        # (land_value is a per-parcel constant), so no second flag is needed for gap; only
-        # total-RLV vs RLV/SF can disagree, and the UI's top-2-3 list covers that case.
+        # is_best is computed on ONE pinned objective: TOTAL RLV (the default map
+        # objective — see the objective note below). Note: gap ordering is identical to
+        # RLV ordering within a parcel (land_value is a per-parcel constant), so no second
+        # flag is needed for gap; only total-RLV vs RLV/SF can disagree, and the UI's
+        # top-2-3 list covers that case.
         # 5% tie margin: the incumbent best (from the prior bake, if any) keeps is_best
         # unless a challenger beats it by >5% on the objective. Prevents the recommended
         # program flipping month-to-month on input noise. Surface the top 2-3 in the UI.
@@ -1007,7 +1027,23 @@ for each parcel (single process, v1):
                   binding_constraint="no admissible prototype under zoning envelope")
 ```
 
-The map reads `status` to color parcels: `scored` → the RLV/SF gradient; `infeasible`
+**Ranking objectives (v1.3.1 — both metrics are PERSISTED, never derived on read).** The
+bake writes two columns on every `scored` row:
+
+| column | value | role |
+|---|---|---|
+| `rlv_total` | `screening_rlv` | **default** map coloring/sort, and the pinned `is_best` objective |
+| `rlv_per_buildable_sf` | `screening_rlv / program.gross_sf` | selectable **alternate** objective |
+
+Total RLV is the default because RLV/SF is near-constant within a zone — it collapses to
+roughly a constant per zone/prototype/submarket, so coloring on it reproduces the zoning
+map. Total RLV varies parcel to parcel and is the more useful default. `gross_sf` is not a
+column, so RLV/SF is computable *only* at bake time; readers (`latest_bake_for_map`, tiles,
+tables) ORDER BY the stored column and must never divide by `lot_area_sf` at read time —
+that was a third, unintended measure. Migration note in `data/schema.sql`:
+`rlv_per_buildable_sf` cannot be backfilled and is repopulated by re-running the bake.
+
+The map reads `status` to color parcels: `scored` → the total-RLV gradient; `infeasible`
 → gray; `zone_not_encoded` → "not yet covered" shade; `exempt` → neutral "not developable
 (public/exempt)"; `historic` → "historic — restricted" shade. Every parcel is represented
 and every color is explainable. Pre-filtering exempt+historic also shrinks the scored set
@@ -1032,8 +1068,10 @@ FastAPI endpoints, each mapping to a UI action:
 
 ```
 (static) map tiles: regenerated ONCE per bake via tippecanoe -> PMTiles, served from flat
-     storage/CDN. Tile attributes carry rlv, rlv_psf, gap, status, confidence, is_best
-     prototype — so objective switching and filtering happen CLIENT-SIDE with no server call.
+     storage/CDN. Tile attributes carry rlv_total, rlv_per_buildable_sf, gap, status,
+     confidence, is_best prototype — both objectives ship as baked columns (§9), so
+     objective switching and filtering happen CLIENT-SIDE with no server call and no
+     client-side division.
 GET  /map/query?bounds&filters             -> only for the table/compare views; reads bake_results
 GET  /parcel/{ssl}/underwrite?assumptions  -> runs full_cashflow() live for one parcel; caches result
 POST /scenario                             -> save_scenario()
@@ -1042,8 +1080,10 @@ GET  /assumptions/default                  -> get_default_assumption_set()  (aut
 ```
 
 Frontend: React + MapLibre GL over the static PMTiles. Three panels — left filter/objective/
-program pane, center map colored by **RLV-per-buildable-SF percentile-within-view** (default;
-feasibility-gap available as an alternate objective), right drill-down card with the "gated by"
+program pane, center map colored by **total-RLV percentile-within-view** (default: the
+baked `rlv_total`, which is also the objective `is_best` is pinned to, so the color and the
+recommended program agree; `rlv_per_buildable_sf` and feasibility-gap are the selectable
+alternates), right drill-down card with the "gated by"
 callout, the demolition toggle, the developability flag ("existing building: N SF — acquisition
 will run above land value"), editable-assumptions expanded tab, compare view, export. Light
 surfaces, teal single-accent. Query chat is deferred.

@@ -72,6 +72,16 @@ CREATE TABLE bake_results (
   status TEXT NOT NULL,         -- 'scored' | 'infeasible' | 'zone_not_encoded' | 'exempt' | 'historic'
   screening_rlv DOUBLE PRECISION,   -- NULL when not 'scored'
   feasibility_gap DOUBLE PRECISION, -- NULL when not 'scored'
+  -- Both ranking metrics are STORED, not derived at read time (SPEC §9). The map used to
+  -- divide screening_rlv by lot_area_sf on read while the bake selected on
+  -- screening_rlv/gross_sf — two different measures, and gross_sf was never a column.
+  -- Readers now order on these columns and never divide.
+  rlv_total DOUBLE PRECISION,           -- = screening_rlv. The DEFAULT map objective.
+                                        -- screening_rlv is kept verbatim (SPEC §7.1 pins it);
+                                        -- rlv_total is its objective-named twin, so the two
+                                        -- selectable objectives are a matched pair of columns.
+  rlv_per_buildable_sf DOUBLE PRECISION,-- = screening_rlv / program.gross_sf. Alternate
+                                        -- objective. NULL when not 'scored' or gross_sf = 0.
   confidence DOUBLE PRECISION,
   binding_constraint TEXT,     -- for 'scored': far/height/stories; for others: the reason
   computed_at TIMESTAMPTZ,
@@ -79,6 +89,20 @@ CREATE TABLE bake_results (
 );
 CREATE INDEX bake_best_idx ON bake_results (is_best, computed_at);
 CREATE INDEX bake_status_idx ON bake_results (status, computed_at);
+-- The map's default sort: latest batch, best row per parcel, ordered by total RLV.
+CREATE INDEX bake_rlv_total_idx ON bake_results (computed_at, rlv_total DESC);
+
+-- MIGRATION NOTE (pre-Stage-D, applied to any database created before this revision).
+-- `rlv_per_buildable_sf` cannot be backfilled from existing rows — gross_sf was never
+-- persisted — so the columns are added empty and repopulated by re-running the bake
+-- (`python -m bake.run_bake`), which appends a fresh batch. Retention (last 2 batches)
+-- ages the pre-migration batch out on the following run.
+--
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS rlv_total DOUBLE PRECISION;
+--   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS rlv_per_buildable_sf DOUBLE PRECISION;
+--   UPDATE bake_results SET rlv_total = screening_rlv WHERE rlv_total IS NULL;
+--   CREATE INDEX IF NOT EXISTS bake_rlv_total_idx
+--       ON bake_results (computed_at, rlv_total DESC);
 
 CREATE TABLE assumption_sets (
   assumption_set_id TEXT PRIMARY KEY,
