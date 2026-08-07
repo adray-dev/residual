@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgis/postgis:15-3.4
+    environment:
+      POSTGRES_USER: feasibility
+      POSTGRES_PASSWORD: feasibility
+      POSTGRES_DB: feasibility
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+volumes:
+  dbdata:
