@@ -322,6 +322,18 @@ PROVENANCE = {
 When a submarket `MarketData` row supplies a real local rent/cap/cost, the caller flips that
 input's tag to `"submarket"` (or `"local"` once parcel-level data exists), and confidence rises.
 
+**Per-value provenance (v1.5).** The three market-supplied keys above
+(`rent_psf_residential_monthly`, `exit_cap_rate`, `hard_cost_psf`) are tagged `"national"` in
+the baseline `PROVENANCE` map, not `"submarket"` — the table shows the *post-flip* state, and
+hard-coding it made the flip a no-op that pinned every parcel in the city to one confidence
+number. The flip is per input and per submarket: `market_data.provenance` (JSONB) stores the
+tag for each value **that row** genuinely tailors, `MarketData.input_provenance` carries it,
+and `score_confidence` raises (never lowers) the baseline accordingly. So a ward whose rent
+was researched but whose cap rate was borrowed from a comparable scores strictly below a ward
+where both are ward-specific, and a ward with no seeded row at all scores 0.0 — which is the
+honest reading of §3.6 when every input really is a national default. See
+`data/loaders/seed_market.py` for the DC seed and its per-value sources.
+
 ---
 
 ## 3. Stage A — the engine core (BUILD AND VERIFY THIS FIRST)

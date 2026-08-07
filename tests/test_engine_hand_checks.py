@@ -482,17 +482,45 @@ def test_demolition_toggle_lowers_rlv_by_demo_cost_plus_soft_and_contingency():
 
 
 def test_confidence_is_provenance_weighted():
-    # PROVENANCE has 26 entries; exactly 3 are "submarket"
-    # (rent_psf_residential_monthly, exit_cap_rate, hard_cost_psf), the rest "national".
-    #   score = (3 * 0.5 + 23 * 0.0) / 26 = 1.5 / 26 = 0.057692308
-    # v1.4 added rent_premium_factor and exit_cap_adjustment, both "national": they are
-    # placeholder product-type factors, no MarketData row supplies them, and a real market
-    # row cannot promote them (score_confidence only upgrades the three keys it names). So
-    # confidence FALLS from 0.0625 to 0.0577 — the intended signal that the model now leans
-    # on two more un-sourced inputs.
+    # v1.5: all 26 PROVENANCE entries are "national" at baseline, including the three a
+    # MarketData row can supply. With no row — or a fallback row that tailors nothing —
+    # every input really is a national default, so the honest score is 0.0.
     assert len(PROVENANCE) == 26
-    assert score_confidence(PROVENANCE) == pytest.approx(1.5 / 26)
-    assert score_confidence(PROVENANCE, _market()) == pytest.approx(1.5 / 26)
+    assert set(PROVENANCE.values()) == {"national"}
+    assert score_confidence(PROVENANCE) == 0.0
+    assert score_confidence(PROVENANCE, _market()) == 0.0
+
+
+def test_confidence_varies_with_what_the_market_row_actually_sources():
+    # A row promotes only the inputs its own `input_provenance` claims. The DC seed
+    # researches rent and cap but not construction cost, and some wards' caps are borrowed
+    # comparables — so wards land on different scores. This is the map's confidence spread.
+    fully_sourced = _market()
+    fully_sourced.input_provenance = {
+        "rent_psf_residential_monthly": "submarket",
+        "exit_cap_rate": "submarket",
+        "hard_cost_psf": "national",
+    }
+    rent_only = _market()
+    rent_only.input_provenance = {
+        "rent_psf_residential_monthly": "submarket",
+        "exit_cap_rate": "national",
+        "hard_cost_psf": "national",
+    }
+    assert score_confidence(PROVENANCE, fully_sourced) == pytest.approx(1.0 / 26)
+    assert score_confidence(PROVENANCE, rent_only) == pytest.approx(0.5 / 26)
+    assert score_confidence(PROVENANCE, fully_sourced) > score_confidence(
+        PROVENANCE, rent_only
+    ) > score_confidence(PROVENANCE, _market())
+
+
+def test_market_row_can_only_raise_an_input_not_lower_it():
+    # Promotion is one-way (§2.8): a row tagging an input "national" must never pull down a
+    # baseline that some future parcel-level source already raised to "local".
+    upgraded = dict(PROVENANCE, rent_psf_residential_monthly="local")
+    downgrader = _market()
+    downgrader.input_provenance = {"rent_psf_residential_monthly": "national"}
+    assert score_confidence(upgraded, downgrader) == pytest.approx(1.0 / 26)
 
 
 # ---------------------------------------------------------------------------

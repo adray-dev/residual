@@ -274,6 +274,7 @@ def get_market(conn, submarket_id: str | None, as_of: str | None = None) -> Mark
         },
         as_of=row["as_of"].isoformat(),
         source=row["source"],
+        input_provenance=dict(row["provenance"] or {}),
     )
 
 

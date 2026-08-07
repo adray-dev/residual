@@ -49,14 +49,21 @@ PROVENANCE = {
     "soft_cost_pct": "national", "contingency_pct": "national",
     "parking_cost_per_stall": "national", "cost_escalation_annual": "national",
     "demo_cost_psf": "national",
-    "rent_psf_residential_monthly": "submarket", "stabilized_occupancy": "national",
+    # The three MarketData-supplied inputs below start at "national" — the honest baseline,
+    # because with no seeded row the engine really is running the §2 national defaults.
+    # `score_confidence` promotes each one to "submarket" only when a MarketData row's own
+    # `input_provenance` says that value was researched for THAT submarket (§2.8: "the caller
+    # flips that input's tag"). SPEC §2.8's table shows these as "submarket" — that is the
+    # post-flip state it describes, and hard-coding it here made the flip a no-op and pinned
+    # confidence to one number for every parcel in the city (v1.5).
+    "rent_psf_residential_monthly": "national", "stabilized_occupancy": "national",
     "opex_ratio": "national", "rent_growth_annual": "national",
     "construction_ltc": "national", "construction_annual_rate": "national",
     "perm_ltv": "national", "perm_annual_rate": "national",
     "perm_amortization_years": "national", "perm_min_dscr": "national",
-    "exit_cap_rate": "submarket", "selling_cost_pct": "national",
+    "exit_cap_rate": "national", "selling_cost_pct": "national",
     "target_developer_margin": "national", "discount_rate": "national",
-    "hard_cost_psf": "submarket",   # comes from MarketData
+    "hard_cost_psf": "national",   # promoted only by a MarketData row that sources cost
     # v1.4 product-type dimension (§2.4). Tagged "national" deliberately: unlike
     # rent_psf/exit_cap_rate, these are NOT supplied by a MarketData row and are not
     # sourced from anything — they are placeholder factors in engine/prototypes.py. A real

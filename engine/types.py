@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -52,6 +52,12 @@ class MarketData:
     hard_cost_psf: dict         # {ConstructionType: $/SF}  (submarket-adjusted)
     as_of: str
     source: str
+    # Per-input provenance tags for the values THIS row genuinely supplies (§2.8: "the
+    # caller flips that input's tag"). Keys are PROVENANCE keys; values are "submarket" or
+    # "local" when the source reports a geography inside this submarket, "national" when the
+    # value is a citywide/class-level figure or a borrowed comparable. Empty (the default)
+    # means a plain national fallback row: it promotes nothing.
+    input_provenance: dict = field(default_factory=dict)
 
 
 @dataclass

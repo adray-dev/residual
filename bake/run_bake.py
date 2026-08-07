@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 from data import repositories as repo
 from data.loaders.seed_market import (
-    AS_OF as FALLBACK_AS_OF,
+    FALLBACK_AS_OF,
     FALLBACK_COST_PSF,
     FALLBACK_EXIT_CAP,
     FALLBACK_RENT_PSF_MONTHLY,
@@ -77,8 +77,9 @@ def national_fallback_market(submarket_id: str | None) -> MarketData:
     """SPEC §7.2: until a submarket is seeded, fall back to the §2 national defaults.
 
     Reuses the constants `data/loaders/seed_market.py` already authors from SPEC §2.4/§2.6/§5,
-    so the fallback and the seed can never drift apart. Provenance (and therefore confidence)
-    is unaffected — `score_confidence` reads PROVENANCE, never these values.
+    so the fallback and the seed can never drift apart. `input_provenance` is left empty on
+    purpose: this row tailors nothing, so it promotes nothing and the submarket scores the
+    floor confidence (§2.8, §3.6).
     """
     return MarketData(
         submarket_id=submarket_id or "",

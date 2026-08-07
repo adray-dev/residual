@@ -52,6 +52,12 @@ CREATE TABLE market_data (
   exit_cap DOUBLE PRECISION,
   as_of DATE,
   source TEXT,
+  provenance JSONB NOT NULL DEFAULT '{}'::jsonb,   -- {input_name: "local"|"submarket"|"national"}
+                           -- per-value tags for what THIS row genuinely tailors (§2.8).
+                           -- One `source` column cannot say that a ward's rent was
+                           -- researched but its cap rate borrowed from a comparable;
+                           -- confidence needs to know, so the tags are stored, not parsed
+                           -- back out of prose. Empty {} = plain national fallback.
   PRIMARY KEY (submarket_id, use_type, as_of)
 );
 
