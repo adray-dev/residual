@@ -293,6 +293,52 @@ def latest_batch_at(conn) -> datetime | None:
         return cur.fetchone()["t"]
 
 
+def list_bake_batches(conn) -> list[datetime]:
+    """Every retained batch, newest first (SPEC §9 keeps the last 2)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT computed_at AS t FROM bake_results ORDER BY computed_at DESC"
+        )
+        return [r["t"] for r in cur.fetchall()]
+
+
+def best_prototypes_at(conn, computed_at: datetime) -> dict[str, str]:
+    """{ssl: prototype_id} of the scored winners in one batch — the tie-margin incumbents."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT ssl, prototype_id FROM bake_results
+               WHERE computed_at = %s AND is_best AND status = 'scored'""",
+            (computed_at,),
+        )
+        return {r["ssl"]: r["prototype_id"] for r in cur.fetchall()}
+
+
+def bake_status_counts(conn, computed_at: datetime | None = None) -> dict[str, int]:
+    """Parcel counts by status in a batch (defaults to the latest)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT status, count(*) AS n FROM bake_results
+               WHERE computed_at = COALESCE(%s, (SELECT max(computed_at) FROM bake_results))
+                 AND is_best
+               GROUP BY status ORDER BY n DESC""",
+            (computed_at,),
+        )
+        return {r["status"]: r["n"] for r in cur.fetchall()}
+
+
+def bake_rows_for_ssl(conn, ssl: str, computed_at: datetime | None = None) -> list[dict]:
+    """Every prototype row baked for one parcel in a batch (defaults to the latest)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT * FROM bake_results
+               WHERE ssl = %s
+                 AND computed_at = COALESCE(%s, (SELECT max(computed_at) FROM bake_results))
+               ORDER BY prototype_id""",
+            (ssl, computed_at),
+        )
+        return cur.fetchall()
+
+
 def prune_bake_batches(conn, keep: int = 2) -> int:
     """Delete all but the most recent `keep` batches (SPEC §9 batch retention)."""
     with conn.cursor() as cur:
