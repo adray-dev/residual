@@ -87,6 +87,22 @@ moving on. Build Stage A first and prove it with `pytest` before touching data.
 > as well as on the district. The district-wide-vs-street-segment overstatement remains, is
 > narrowed to mid/high-rise inside mandated districts, and is recorded in §11.
 
+> **Revision v1.4 — product type enters the revenue model (§2.4, §5).**
+> The pro forma applied one submarket rent and one flat exit cap to all four prototypes,
+> which made density unwinnable by construction — townhome converts $1 of hard cost into
+> 4.286 rentable SF against midrise's 2.353, so at equal rent and equal cap the walk-up wins
+> every parcel at every rent level. The bake showed the degenerate result: townhome `is_best`
+> on 100% of scored parcels, mid/high-rise winning nowhere.
+> - `RENT_PREMIUM_FACTOR` and `EXIT_CAP_ADJUSTMENT` (`engine/prototypes.py`) modulate the
+>   submarket base rent and base cap per prototype; `screening_rlv` and `full_cashflow` apply
+>   both identically.
+> - Both are tagged `national` in `PROVENANCE`. They are **placeholder assumptions, not
+>   sourced** (§11), and no `MarketData` row can promote them — so confidence drops from
+>   0.0625 to 0.0577 on every parcel, which is the honest signal.
+> - The `Prototype` dataclass (§3.1) is unchanged: the factors are module-level maps keyed by
+>   `prototype_id`, following the existing `min_lot_sf` / `NATIONAL_HARD_COST_PSF` pattern, so
+>   the pinned schema and the `prototypes` table stay as they are.
+
 ---
 
 ## 0. Product in one paragraph
@@ -188,6 +204,27 @@ completes + hold buffer.
 | stabilized_occupancy | 94% | national |
 | opex_ratio (of EGI) | 35% | national |
 | rent_growth_annual | 3.0% | national |
+| rent_premium_factor | product-type multiplier on the base rent (§5) | national |
+| exit_cap_adjustment | product-type adjustment on the base cap (§5) | national |
+
+**Product type is a revenue dimension (v1.4).** A submarket supplies ONE base rent and ONE
+base cap. Those are quoted for the low-rise product; the pro forma then adjusts both by
+prototype before any revenue is computed:
+
+```
+effective rent = market.rent_psf_residential_monthly * RENT_PREMIUM_FACTOR[prototype]
+effective cap  = market.exit_cap_rate               + EXIT_CAP_ADJUSTMENT[prototype]
+```
+
+Both `screening_rlv` and `full_cashflow` apply this identically — the drill-down must not
+contradict the map colour it was opened from. Without it, density is unwinnable by
+construction: a townhome turns $1 of hard cost into 4.286 rentable SF against a midrise's
+2.353, so at one rent and one cap the walk-up wins every parcel in every submarket at every
+rent level, which is exactly what the bake produced (townhome `is_best` on 100% of scored
+parcels). The factors themselves are **placeholder assumptions, not sourced** — see §5 for
+the values and §11 for what they are waiting on. They are tagged `national` in `PROVENANCE`
+precisely so confidence reports them as un-tailored; a real `MarketData` row cannot promote
+them, so adding them *lowers* every parcel's confidence (0.0625 → 0.0577).
 
 ### 2.5 Debt defaults
 | Field | Value | Provenance |
@@ -636,6 +673,20 @@ Four prototypes, all rental. `min_stories` is the admissibility gate against the
 | garden | wood_v | 2–4 | 15,000 | 0.85 | surface | 20/50/30 | 500/750/1050 | $210 |
 | midrise | concrete_i | 5–12 | 8,000 | 0.80 | podium | 25/50/25 | 500/750/1050 | $340 |
 | highrise | concrete_i | 12–30 | 12,000 | 0.75 | structured | 30/50/20 | 480/720/1000 | $430 |
+
+**Product-type revenue factors (v1.4).** Applied by `screening_rlv` and `full_cashflow` to
+the submarket base rent and base cap (§2.4). **Placeholder assumptions — not sourced.**
+
+| id | rent_premium_factor | exit_cap_adjustment | rationale (assumed, unverified) |
+|---|---|---|---|
+| townhome | 1.00 | +0 bps | the base — submarket rent is quoted for this product |
+| garden | 1.00 | +0 bps | walk-up, no elevator or amenity package |
+| midrise | 1.15 | −25 bps | new elevator product, amenity package |
+| highrise | 1.30 | −50 bps | full-service Class A, institutional buyer pool |
+
+The effective cap is floored at `MIN_EXIT_CAP_RATE = 0.001` so a future submarket cap or a
+hand-edited assumption set cannot divide by zero in the exit valuation (unreachable at v1's
+5.5% base; the engine never raises to the caller).
 
 **Ground-floor active use is a prototype property too (v1.3.2).**
 `GROUND_FLOOR_ACTIVE_PROTOTYPES = {midrise, highrise}` — the only building types that
@@ -1161,6 +1212,15 @@ only place the full engine runs live, one parcel at a time, cached, re-run only 
   v1.3.2 it applied to every prototype in those districts and was the single largest
   distortion in the bake. Fix needs a street-segment layer.
 - Coverage-ratio setback simplification (§3.2) — no true setback geometry without lot dimensions.
+- **Product-type rent premium and exit-cap adjustment are placeholder assumptions (§2.4/§5).**
+  `RENT_PREMIUM_FACTOR` (1.00/1.00/1.15/1.30) and `EXIT_CAP_ADJUSTMENT` (0/0/−25bps/−50bps)
+  were chosen as plausible starting values to give product type a voice in the model, not
+  measured from anything. They are load-bearing for which prototype wins a parcel, so the
+  `is_best` distribution across the map is only as good as these two numbers. What they want
+  is **real rent-by-product-type and cap-by-product-type data per submarket** — DC Class A
+  elevator rents versus rowhouse rents is an empirical question with a real answer, and these
+  are not it. Both are tagged `national` in `PROVENANCE`, so confidence already reports them
+  as un-tailored. Do not present the resulting prototype ordering as a finding until seeded.
 - Ward-level rents — submarket averages; parcel-level comps are the data-moat upgrade.
 - Historic parcels gated, not modeled — HPRB-compatible redevelopment is a later feature.
 - Screening RLV (unlevered, margin-based) vs full RLV (levered, IRR-based) will diverge;

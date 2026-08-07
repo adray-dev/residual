@@ -57,4 +57,12 @@ PROVENANCE = {
     "exit_cap_rate": "submarket", "selling_cost_pct": "national",
     "target_developer_margin": "national", "discount_rate": "national",
     "hard_cost_psf": "submarket",   # comes from MarketData
+    # v1.4 product-type dimension (§2.4). Tagged "national" deliberately: unlike
+    # rent_psf/exit_cap_rate, these are NOT supplied by a MarketData row and are not
+    # sourced from anything — they are placeholder factors in engine/prototypes.py. A real
+    # submarket row cannot upgrade them (score_confidence only promotes the three keys it
+    # names), so every parcel now carries two more un-tailored inputs and confidence falls
+    # accordingly. That is the intended signal until rent-by-product-type data exists.
+    "rent_premium_factor": "national",
+    "exit_cap_adjustment": "national",
 }

@@ -92,29 +92,34 @@ def test_a_far_binding_midrise_screening_rlv():
     assert prog.construction_type == ConstructionType.CONCRETE_I
 
     out = screening_rlv(prog, market, DEFAULT_ASSUMPTIONS, parcel)
-    # RLV HAND CHECK
-    #   gross_residential = 20,000 * 3.20 * 12                = 768,000
-    #   egi               = 768,000 * 0.94                    = 721,920
-    #   noi               = 721,920 * 0.65                    = 469,248
-    #   exit_value        = 469,248 / 0.055                   = 8,531,781.818182
+    # RLV HAND CHECK — v1.4 product-type adjustment (§2.4) applies: midrise carries a
+    # 1.15 rent premium and a -25 bps cap adjustment off the submarket base.
+    #   rent_psf          = 3.20 * 1.15                       = 3.68
+    #   exit_cap          = 0.055 - 0.0025                    = 0.0525
+    #   gross_residential = 20,000 * 3.68 * 12                = 883,200
+    #   egi               = 883,200 * 0.94                    = 830,208
+    #   noi               = 830,208 * 0.65                    = 539,635.20
+    #   exit_value        = 539,635.20 / 0.0525               = 10,278,765.714286
     #   hard shell        = 25,000 * 340                      = 8,500,000
     #   hard parking      = 13 * 45,000 (podium)              =   585,000
     #   hard              =                                     9,085,000
     #   soft              = 9,085,000 * 0.20                  = 1,817,000
     #   contingency       = 9,085,000 * 0.05                  =   454,250
-    #   cost_ex_land      =                                    11,356,250
-    #   profit            = 8,531,781.818182 * 0.15           = 1,279,767.272727
-    #   RLV = 8,531,781.818182 - 11,356,250 - 1,279,767.272727
-    #                                                         = -4,104,235.454545
-    #   gap = -4,104,235.454545 - 1,100,000                   = -5,204,235.454545
-    #   yoc = 469,248 / 11,356,250                            = 0.04132068
-    #   margin = (8,531,781.818182 - 11,356,250) / 11,356,250 = -0.24871486
-    assert out.screening_rlv == pytest.approx(-4_104_235.454545, abs=1.0)
-    assert out.feasibility_gap == pytest.approx(-5_204_235.454545, abs=1.0)
+    #   cost_ex_land      =                                    11,356,250   (cost is unchanged)
+    #   profit            = 10,278,765.714286 * 0.15          = 1,541,814.857143
+    #   RLV = 10,278,765.714286 - 11,356,250 - 1,541,814.857143
+    #                                                         = -2,619,299.142857
+    #   gap = -2,619,299.142857 - 1,100,000                   = -3,719,299.142857
+    #   yoc = 539,635.20 / 11,356,250                         = 0.04751878
+    #   margin = (10,278,765.714286 - 11,356,250) / 11,356,250 = -0.09488029
+    # The premium+cap lift RLV by 1,484,936.31 vs the flat-rent model; still negative here,
+    # which is the point of case (a) — FAR-bound midrise at $3.20 base rent does not pencil.
+    assert out.screening_rlv == pytest.approx(-2_619_299.142857, abs=1.0)
+    assert out.feasibility_gap == pytest.approx(-3_719_299.142857, abs=1.0)
     assert out.total_development_cost == pytest.approx(11_356_250, abs=1.0)
-    assert out.exit_value == pytest.approx(8_531_781.818182, abs=1.0)
-    assert out.yield_on_cost == pytest.approx(0.04132068, abs=1e-8)
-    assert out.profit_margin == pytest.approx(-0.24871486, abs=1e-8)
+    assert out.exit_value == pytest.approx(10_278_765.714286, abs=1.0)
+    assert out.yield_on_cost == pytest.approx(0.04751878, abs=1e-8)
+    assert out.profit_margin == pytest.approx(-0.09488029, abs=1e-8)
 
 
 # ---------------------------------------------------------------------------
@@ -292,23 +297,28 @@ def test_d_negative_rlv_highrise():
     assert prog.unit_count == 159
     assert prog.parking_stalls == 40
 
-    # RLV HAND CHECK — highrise concrete priced at the §5 national fallback of $430/SF
-    #   gross_residential = 112,500 * 2.50 * 12       =  3,375,000
-    #   egi               = 3,375,000 * 0.94          =  3,172,500
-    #   noi               = 3,172,500 * 0.65          =  2,062,125
-    #   exit_value        = 2,062,125 / 0.065         = 31,725,000  (exact)
+    # RLV HAND CHECK — highrise concrete priced at the §5 national fallback of $430/SF,
+    # with the v1.4 product-type adjustment: 1.30 rent premium, -50 bps cap.
+    #   rent_psf          = 2.50 * 1.30               =  3.25
+    #   exit_cap          = 0.065 - 0.0050            =  0.060
+    #   gross_residential = 112,500 * 3.25 * 12       =  4,387,500
+    #   egi               = 4,387,500 * 0.94          =  4,124,250
+    #   noi               = 4,124,250 * 0.65          =  2,680,762.50
+    #   exit_value        = 2,680,762.50 / 0.060      = 44,679,375  (exact)
     #   hard shell        = 150,000 * 430             = 64,500,000
     #   hard parking      = 40 * 35,000 (structured)  =  1,400,000
     #   hard              =                             65,900,000
     #   soft              = 65,900,000 * 0.20         = 13,180,000
     #   contingency       = 65,900,000 * 0.05         =  3,295,000
     #   cost_ex_land      =                             82,375,000
-    #   profit            = 31,725,000 * 0.15         =  4,758,750
-    #   RLV = 31,725,000 - 82,375,000 - 4,758,750     = -55,408,750
-    #   gap = -55,408,750 - 3,000,000                 = -58,408,750
+    #   profit            = 44,679,375 * 0.15         =  6,701,906.25
+    #   RLV = 44,679,375 - 82,375,000 - 6,701,906.25  = -44,397,531.25
+    #   gap = -44,397,531.25 - 3,000,000              = -47,397,531.25
+    # Deeply negative even with the premium: $2.50 base rent cannot carry $430/SF concrete.
+    # That is the case this test exists to pin — the premium moves the number, not the sign.
     out = screening_rlv(prog, market, DEFAULT_ASSUMPTIONS, parcel)
-    assert out.screening_rlv == pytest.approx(-55_408_750, abs=1.0)
-    assert out.feasibility_gap == pytest.approx(-58_408_750, abs=1.0)
+    assert out.screening_rlv == pytest.approx(-44_397_531.25, abs=1.0)
+    assert out.feasibility_gap == pytest.approx(-47_397_531.25, abs=1.0)
     assert out.feasibility_gap < 0
 
 
@@ -364,21 +374,23 @@ def test_e_ground_floor_active_carveout_applies_to_midrise():
     assert prog.parking_stalls == 62
 
     out = screening_rlv(prog, _market(), DEFAULT_ASSUMPTIONS, parcel)
-    # RLV HAND CHECK
-    #   gross_residential = 48,000 * 3.20 * 12           =  1,843,200
-    #   egi               = 1,843,200 * 0.94             =  1,732,608
-    #   noi               = 1,732,608 * 0.65             =  1,126,195.20
-    #   exit_value        = 1,126,195.20 / 0.055         = 20,476,276.363636
+    # RLV HAND CHECK — midrise, so the v1.4 premium (1.15) and cap adjustment (-25 bps) apply
+    #   rent_psf          = 3.20 * 1.15                  =  3.68
+    #   exit_cap          = 0.055 - 0.0025               =  0.0525
+    #   gross_residential = 48,000 * 3.68 * 12           =  2,119,680
+    #   egi               = 2,119,680 * 0.94             =  1,992,499.20
+    #   noi               = 1,992,499.20 * 0.65          =  1,295,124.48
+    #   exit_value        = 1,295,124.48 / 0.0525        = 24,669,037.714286
     #   hard shell        = 72,000 * 340 (FULL gross)    = 24,480,000
     #   hard parking      = 62 * 45,000 (podium)         =  2,790,000
     #   hard              =                                27,270,000
     #   soft              = 27,270,000 * 0.20            =  5,454,000
     #   contingency       = 27,270,000 * 0.05            =  1,363,500
     #   cost_ex_land      =                                34,087,500
-    #   profit            = 20,476,276.363636 * 0.15     =  3,071,441.454545
-    #   RLV = 20,476,276.363636 - 34,087,500 - 3,071,441.454545
-    #                                                    = -16,682,665.090909
-    assert out.screening_rlv == pytest.approx(-16_682_665.090909, abs=1.0)
+    #   profit            = 24,669,037.714286 * 0.15     =  3,700,355.657143
+    #   RLV = 24,669,037.714286 - 34,087,500 - 3,700,355.657143
+    #                                                    = -13,118,817.942857
+    assert out.screening_rlv == pytest.approx(-13_118_817.942857, abs=1.0)
 
 
 @pytest.mark.parametrize("proto_id", ["townhome", "garden"])
@@ -470,12 +482,17 @@ def test_demolition_toggle_lowers_rlv_by_demo_cost_plus_soft_and_contingency():
 
 
 def test_confidence_is_provenance_weighted():
-    # PROVENANCE has 24 entries; exactly 3 are "submarket"
+    # PROVENANCE has 26 entries; exactly 3 are "submarket"
     # (rent_psf_residential_monthly, exit_cap_rate, hard_cost_psf), the rest "national".
-    #   score = (3 * 0.5 + 21 * 0.0) / 24 = 1.5 / 24 = 0.0625
-    assert len(PROVENANCE) == 24
-    assert score_confidence(PROVENANCE) == pytest.approx(0.0625)
-    assert score_confidence(PROVENANCE, _market()) == pytest.approx(0.0625)
+    #   score = (3 * 0.5 + 23 * 0.0) / 26 = 1.5 / 26 = 0.057692308
+    # v1.4 added rent_premium_factor and exit_cap_adjustment, both "national": they are
+    # placeholder product-type factors, no MarketData row supplies them, and a real market
+    # row cannot promote them (score_confidence only upgrades the three keys it names). So
+    # confidence FALLS from 0.0625 to 0.0577 — the intended signal that the model now leans
+    # on two more un-sourced inputs.
+    assert len(PROVENANCE) == 26
+    assert score_confidence(PROVENANCE) == pytest.approx(1.5 / 26)
+    assert score_confidence(PROVENANCE, _market()) == pytest.approx(1.5 / 26)
 
 
 # ---------------------------------------------------------------------------

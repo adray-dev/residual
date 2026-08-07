@@ -1,5 +1,6 @@
 import numpy as np
 
+from engine.prototypes import effective_exit_cap, effective_rent_psf_monthly
 from engine.solve import safe_irr
 from engine.types import (
     Assumptions,
@@ -26,12 +27,20 @@ def screening_rlv(
 ) -> Outputs:
     rev = assumptions.revenue
 
+    # Product type modulates both revenue inputs (§2.4, v1.4): a submarket quotes one base
+    # rent and one base cap; elevator product earns a premium on the first and trades
+    # tighter on the second. Placeholder factors — see engine/prototypes.py.
+    rent_psf = effective_rent_psf_monthly(
+        market.rent_psf_residential_monthly, program.prototype_id
+    )
+    exit_cap = effective_exit_cap(market.exit_cap_rate, program.prototype_id)
+
     # --- stabilized NOI (per-SF basis only; unit_count never enters revenue) ---
-    gross_residential = program.net_rentable_sf * market.rent_psf_residential_monthly * 12
+    gross_residential = program.net_rentable_sf * rent_psf * 12
     egi = gross_residential * rev["stabilized_occupancy"]
     noi = egi * (1 - rev["opex_ratio"])
 
-    exit_value = noi / market.exit_cap_rate
+    exit_value = noi / exit_cap
 
     # --- costs (land excluded — RLV solves for it) ---
     hard = program.gross_sf * market.hard_cost_psf[program.construction_type]
@@ -146,7 +155,14 @@ def full_cashflow(
     total_cost = costs_v.sum()
 
     # ---- revenue (§6.3) ----
-    potential_annual = program.net_rentable_sf * market.rent_psf_residential_monthly * 12
+    # Same product-type adjustment as screening_rlv (§2.4) — the two must agree, or the
+    # drill-down would contradict the map colour it was opened from.
+    rent_psf = effective_rent_psf_monthly(
+        market.rent_psf_residential_monthly, program.prototype_id
+    )
+    exit_cap = effective_exit_cap(market.exit_cap_rate, program.prototype_id)
+
+    potential_annual = program.net_rentable_sf * rent_psf * 12
     units_per_month = program.unit_count / l if l > 0 else 0.0   # derived absorption
     for t in range(p + c, n):
         occupied = min(units_per_month * (t - (p + c) + 1), program.unit_count)
@@ -178,7 +194,7 @@ def full_cashflow(
 
     # ---- permanent takeout at stabilization (§6.5) ----
     stabilized_noi = noi_v[stab] * 12
-    stabilized_value = stabilized_noi / market.exit_cap_rate
+    stabilized_value = stabilized_noi / exit_cap
     p_rate_m = debt["perm_annual_rate"] / 12
     p_n = int(debt["perm_amortization_years"]) * 12
 
@@ -202,7 +218,7 @@ def full_cashflow(
         eq_v[t] += noi_v[t] - pds_v[t]
 
     # ---- exit (§6.6) ----
-    gross_sale = noi_v[T] * 12 / market.exit_cap_rate
+    gross_sale = noi_v[T] * 12 / exit_cap
     net_sale = gross_sale * (1 - ex["selling_cost_pct"]) - perm_balance
     eq_v[T] += net_sale
 
