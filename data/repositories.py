@@ -27,6 +27,12 @@ from engine.types import (
 
 NONE_PROTOTYPE = "__none__"   # bake_results sentinel for status rows (SPEC §7.1)
 
+# Every read that feeds the map or a table must be scoped to ONE batch, or retention's two
+# retained batches (SPEC §9) return each parcel twice. This is that scope, named once so a
+# new reader cannot quietly omit it. `run_bake` commits a batch atomically, so `max` never
+# resolves to a half-written one.
+LATEST_BATCH = "(SELECT max(computed_at) FROM bake_results)"
+
 _PARCEL_COLS = """
     ssl, lot_area_sf, zone_code, submarket_id, land_value, improvement_value,
     improvement_ratio, land_use_code, existing_building_sf, is_exempt, is_historic
@@ -317,10 +323,10 @@ def bake_status_counts(conn, computed_at: datetime | None = None) -> dict[str, i
     """Parcel counts by status in a batch (defaults to the latest)."""
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT status, count(*) AS n FROM bake_results
-               WHERE computed_at = COALESCE(%s, (SELECT max(computed_at) FROM bake_results))
-                 AND is_best
-               GROUP BY status ORDER BY n DESC""",
+            f"""SELECT status, count(*) AS n FROM bake_results
+                WHERE computed_at = COALESCE(%s, {LATEST_BATCH})
+                  AND is_best
+                GROUP BY status ORDER BY n DESC""",
             (computed_at,),
         )
         return {r["status"]: r["n"] for r in cur.fetchall()}
@@ -330,10 +336,10 @@ def bake_rows_for_ssl(conn, ssl: str, computed_at: datetime | None = None) -> li
     """Every prototype row baked for one parcel in a batch (defaults to the latest)."""
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT * FROM bake_results
-               WHERE ssl = %s
-                 AND computed_at = COALESCE(%s, (SELECT max(computed_at) FROM bake_results))
-               ORDER BY prototype_id""",
+            f"""SELECT * FROM bake_results
+                WHERE ssl = %s
+                  AND computed_at = COALESCE(%s, {LATEST_BATCH})
+                ORDER BY prototype_id""",
             (ssl, computed_at),
         )
         return cur.fetchall()
@@ -363,7 +369,8 @@ def latest_bake_for_map(
     time (SPEC §9). `filters` accepts `status`, `min_confidence`, `submarket_id`.
     """
     filters = filters or {}
-    where = ["b.computed_at = (SELECT max(computed_at) FROM bake_results)", "b.is_best"]
+    # Scoped to the latest batch AND is_best: exactly one row per parcel (SPEC §9).
+    where = [f"b.computed_at = {LATEST_BATCH}", "b.is_best"]
     params: list[Any] = []
 
     if bounds is not None:
