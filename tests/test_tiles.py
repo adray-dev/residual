@@ -12,7 +12,6 @@ Two halves, for two different failure modes:
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 
@@ -25,20 +24,10 @@ from tiles.build_tiles import (
     build_features,
 )
 
-ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-
 
 def _database_url() -> str | None:
-    """DATABASE_URL from the environment, falling back to `.env` (pytest doesn't load it)."""
-    url = os.environ.get("DATABASE_URL")
-    if url:
-        return url
-    if ENV_FILE.exists():
-        for line in ENV_FILE.read_text().splitlines():
-            key, _, value = line.partition("=")
-            if key.strip() == "DATABASE_URL":
-                return value.strip() or None
-    return None
+    """DATABASE_URL, which importing `data.repositories` has already loaded from `.env`."""
+    return os.environ.get("DATABASE_URL") or None
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Iterable, Iterator, Mapping
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
 from engine.prototypes import PROTOTYPES
@@ -24,6 +25,16 @@ from engine.types import (
     Use,
     ZoningRules,
 )
+
+# `.env` is loaded here, at import of the one module that owns database access, because
+# every entry point that needs a connection — uvicorn, `python -m bake.run_bake`,
+# `python -m tiles.build_tiles`, pytest — reaches the database through this module and
+# nothing else. Loading it in each entry point instead would mean four places to forget.
+#
+# `override=False`: a DATABASE_URL already exported in the shell wins over the file, so
+# pointing a single command at another database stays a one-liner and CI, which sets the
+# variable directly and ships no `.env`, is unaffected.
+load_dotenv(override=False)
 
 NONE_PROTOTYPE = "__none__"   # bake_results sentinel for status rows (SPEC §7.1)
 
@@ -100,7 +111,10 @@ def resolve_rules(
 def database_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
-        raise RuntimeError("DATABASE_URL is not set (see .env.example)")
+        raise RuntimeError(
+            "DATABASE_URL is not set. Copy .env.example to .env — it is loaded "
+            "automatically and does not need to be exported."
+        )
     return url
 
 

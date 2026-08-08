@@ -33,9 +33,18 @@ with known-red tests. Use `/stage-a` … `/stage-d` slash commands to kick off e
 ## Commands
 - Setup: `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
 - Tests: `pytest -x -q`
-- DB (Stage B+): `docker compose up -d db` then `psql "$DATABASE_URL" -f data/schema.sql`
+- DB (Stage B+): Postgres runs LOCALLY via Homebrew, not Docker. `brew services start
+  postgresql@14`, then `psql "$DATABASE_URL" -f data/schema.sql` for a fresh schema.
+  `docker-compose.yml` is vestigial — do not use it, and do not suggest `docker compose`.
 - Bake (Stage C): `python -m bake.run_bake`
 - API (Stage D): `uvicorn api.main:app --reload`
+- Frontend (Stage D): `cd web && npm install && npm run dev` → http://localhost:5173
+  (Vite proxies /meta, /map, /parcel, /assumptions, /tiles to the API on :8000)
+- Tiles (Stage D): `python -m tiles.build_tiles` (needs `brew install tippecanoe`)
+
+`.env` is loaded automatically by `data/repositories.py` at import, so DATABASE_URL never
+needs exporting by hand — for uvicorn, pytest, the bake, or the tile build. Copy
+`.env.example` to `.env` on a fresh checkout. An exported DATABASE_URL still overrides it.
 
 ## Layout (create exactly this; see SPEC.md §1)
 ```
