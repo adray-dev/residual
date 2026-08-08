@@ -324,6 +324,34 @@ class UnderwriteRequest(BaseModel):
         }
 
 
+# ---------------------------------------------------------------------------
+# /scenario
+# ---------------------------------------------------------------------------
+class ScenarioSaveRequest(UnderwriteRequest):
+    """Save = re-run + freeze. The client sends the INPUTS, never the results.
+
+    Inheriting `UnderwriteRequest` is deliberate: a scenario is saved from exactly the same
+    input surface the drill-down was run with, so the two cannot drift apart.
+    """
+    parcel_id: str
+    name: str | None = None
+
+
+class ScenarioRef(BaseModel):
+    scenario_id: str
+    parcel_id: str
+
+
+class ScenarioSummary(BaseModel):
+    scenario_id: str
+    parcel_id: str
+    display_name: str
+    ward: str | None
+    prototype_id: str
+    saved_at: datetime
+    full_rlv: float | None
+
+
 class ProgramOut(BaseModel):
     """The 1b Program card. Labels come from /meta; this is the data behind them."""
     prototype_id: str

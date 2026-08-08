@@ -10,7 +10,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: Object.fromEntries(
-      ["/meta", "/map", "/parcel", "/assumptions", "/tiles", "/health"].map((path) => [
+      // Prefix matches, so "/scenario" also covers "/scenarios" and "/scenario/{id}/export".
+      // Every API path the client can reach must be listed: an unproxied one silently
+      // returns the dev server's index.html, which fails as "unexpected token '<'" rather
+      // than as anything resembling a missing route.
+      ["/meta", "/map", "/parcel", "/assumptions", "/scenario", "/tiles", "/health"].map((path) => [
         path,
         { target: process.env.API_ORIGIN ?? "http://127.0.0.1:8000", changeOrigin: true },
       ]),

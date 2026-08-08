@@ -76,6 +76,9 @@ export function Drilldown({
   busy = false,
   onDemolitionChange,
   onEditAssumptions,
+  onSaveScenario,
+  onExport,
+  saveState = "idle",
   onClose,
 }: {
   data: Underwrite;
@@ -85,6 +88,10 @@ export function Drilldown({
   busy?: boolean;
   onDemolitionChange: (next: boolean) => void;
   onEditAssumptions?: () => void;
+  onSaveScenario?: () => void;
+  onExport?: () => void;
+  /** "Saved" / "Saving…" — transient feedback on the footer's save button. */
+  saveState?: "idle" | "saving" | "saved";
   onClose?: () => void;
 }) {
   const lot = data.lot_area_sf ? `${count(data.lot_area_sf)} SF lot` : null;
@@ -166,10 +173,23 @@ export function Drilldown({
             ? `Edit assumptions · ${data.overrides_changed} changed`
             : "Edit assumptions & re-underwrite"}
         </button>
-        <button className={styles.footerSecondary} disabled>
-          Save scenario
+        {/* Saving freezes this underwrite (SPEC 7.1): the market values it used are
+            stamped and never re-read, so it reproduces after a re-bake. */}
+        <button
+          className={styles.footerSecondary}
+          onClick={onSaveScenario}
+          disabled={!onSaveScenario || busy || saveState === "saving"}
+        >
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save scenario"}
         </button>
-        <button className={styles.footerSecondary} disabled>
+        {/* Export needs a saved scenario to export — the file is the frozen record, not a
+            re-serialisation of whatever the panel happens to be showing. */}
+        <button
+          className={styles.footerSecondary}
+          onClick={onExport}
+          disabled={!onExport || busy}
+          title={onExport ? "Download the saved scenario" : "Save the scenario first"}
+        >
           Export
         </button>
       </footer>

@@ -667,6 +667,112 @@ def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> It
             yield row
 
 
+# ---------------------------------------------------------------------------
+# scenarios (SPEC §7.1, §10)
+# ---------------------------------------------------------------------------
+def upsert_assumption_set(conn, row: Mapping) -> None:
+    """Store the assumption set a scenario was run under, so it can be replayed exactly.
+
+    A scenario references its assumption set by id, and an edited run has a set that exists
+    nowhere else — writing it here is what makes the saved scenario reproducible rather
+    than a set of numbers with no inputs behind them.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO assumption_sets
+                   (assumption_set_id, name, is_default,
+                    program, timeline, cost, revenue, debt, exit, envelope)
+               VALUES (%(assumption_set_id)s, %(name)s, FALSE,
+                       %(program)s, %(timeline)s, %(cost)s, %(revenue)s,
+                       %(debt)s, %(exit)s, %(envelope)s)
+               ON CONFLICT (assumption_set_id) DO NOTHING""",
+            {
+                "assumption_set_id": row["assumption_set_id"],
+                "name": row.get("name"),
+                **{
+                    group: json.dumps(row.get(group) or {})
+                    for group in ("program", "timeline", "cost", "revenue", "debt",
+                                  "exit", "envelope")
+                },
+            },
+        )
+
+
+def save_scenario(conn, row: Mapping) -> str:
+    """Freeze one underwrite. Returns the scenario id.
+
+    `market_snapshot` is stamped here and never re-read (SPEC §7.1): a saved scenario is
+    reproducible forever, even after a re-bake moves the market row underneath it. That is
+    the opposite of a shortlist, which deliberately reads live so it cannot go stale.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO scenarios
+                   (scenario_id, ssl, prototype_id, assumption_set_id, user_id,
+                    market_snapshot, cashflow, outputs, saved_at)
+               VALUES (%(scenario_id)s, %(ssl)s, %(prototype_id)s, %(assumption_set_id)s,
+                       %(user_id)s, %(market_snapshot)s, %(cashflow)s, %(outputs)s, now())
+               RETURNING scenario_id""",
+            {
+                "scenario_id": row["scenario_id"],
+                "ssl": row["ssl"],
+                "prototype_id": row["prototype_id"],
+                "assumption_set_id": row["assumption_set_id"],
+                "user_id": row.get("user_id", "local"),
+                "market_snapshot": json.dumps(row["market_snapshot"]),
+                "cashflow": json.dumps(row["cashflow"]),
+                "outputs": json.dumps(row["outputs"]),
+            },
+        )
+        return cur.fetchone()["scenario_id"]
+
+
+_SCENARIO_SELECT = """
+    s.scenario_id, s.ssl, s.prototype_id, s.assumption_set_id, s.user_id,
+    s.market_snapshot, s.cashflow, s.outputs, s.saved_at,
+    p.address, p.submarket_id,
+    a.name AS assumption_set_name,
+    a.program, a.timeline, a.cost, a.revenue, a.debt, a.exit, a.envelope
+"""
+
+
+def get_scenario(conn, scenario_id: str) -> dict | None:
+    """One frozen scenario, with the assumption set it was run under."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT {_SCENARIO_SELECT}
+                  FROM scenarios s
+                  LEFT JOIN parcels p USING (ssl)
+                  LEFT JOIN assumption_sets a USING (assumption_set_id)
+                 WHERE s.scenario_id = %s""",
+            (scenario_id,),
+        )
+        return cur.fetchone()
+
+
+def list_scenarios(conn, user_id: str = "local", limit: int = 200) -> list[dict]:
+    """Saved scenarios, newest first. Summary only — the frozen blobs stay out of the list."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT s.scenario_id, s.ssl, s.prototype_id, s.saved_at,
+                      p.address, p.submarket_id,
+                      s.outputs -> 'feasibility_value' ->> 'full' AS full_rlv
+                 FROM scenarios s
+                 LEFT JOIN parcels p USING (ssl)
+                WHERE s.user_id = %s
+                ORDER BY s.saved_at DESC
+                LIMIT %s""",
+            (user_id, limit),
+        )
+        return cur.fetchall()
+
+
+def delete_scenario(conn, scenario_id: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM scenarios WHERE scenario_id = %s", (scenario_id,))
+        return cur.rowcount > 0
+
+
 def list_submarkets(conn) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute("SELECT submarket_id, name FROM submarkets ORDER BY submarket_id")
@@ -783,44 +889,3 @@ def latest_bake_for_map(
         return cur.fetchall()
 
 
-# ---------------------------------------------------------------------------
-# scenarios
-# ---------------------------------------------------------------------------
-def save_scenario(
-    conn,
-    scenario_id: str,
-    ssl: str,
-    prototype_id: str,
-    assumption_set_id: str | None,
-    market_snapshot: dict,
-    cashflow: dict,
-    outputs: dict,
-    user_id: str = "local",
-    saved_at: datetime | None = None,
-) -> str:
-    """Freeze a scenario. `market_snapshot` is stamped so it never re-reads live data."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """INSERT INTO scenarios (
-                   scenario_id, ssl, prototype_id, assumption_set_id, user_id,
-                   market_snapshot, cashflow, outputs, saved_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (scenario_id) DO UPDATE SET
-                   market_snapshot = EXCLUDED.market_snapshot,
-                   cashflow = EXCLUDED.cashflow,
-                   outputs = EXCLUDED.outputs,
-                   saved_at = EXCLUDED.saved_at""",
-            (
-                scenario_id, ssl, prototype_id, assumption_set_id, user_id,
-                json.dumps(market_snapshot), json.dumps(cashflow), json.dumps(outputs),
-                saved_at or datetime.now().astimezone(),
-            ),
-        )
-    conn.commit()
-    return scenario_id
-
-
-def get_scenario(conn, scenario_id: str) -> dict | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM scenarios WHERE scenario_id = %s", (scenario_id,))
-        return cur.fetchone()

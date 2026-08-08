@@ -29,6 +29,7 @@ from api.routers import (
     map as map_router,
     meta,
     parcels,
+    scenarios,
     underwrite as underwrite_router,
 )
 from api.settings import settings
@@ -76,6 +77,7 @@ app.include_router(map_router.router)
 app.include_router(underwrite_router.router)
 app.include_router(parcels.router)
 app.include_router(assumptions.router)
+app.include_router(scenarios.router)
 
 # Static PMTiles (SPEC §10: regenerated once per bake, served from flat storage, no live
 # tile server). Mounted only when the directory exists so the API still boots before the

@@ -113,6 +113,24 @@ export function getUnderwrite(
   });
 }
 
+/** Freeze the current underwrite as a scenario (SPEC 7.1).
+ *
+ * The body carries INPUTS, never results: the server re-runs and stores its own numbers,
+ * so a scenario records what the model said rather than what the client claimed. */
+export function saveScenario(
+  parcelId: string,
+  body: UnderwriteRequest & { name?: string },
+): Promise<{ scenario_id: string; parcel_id: string }> {
+  return request("/scenario", {
+    method: "POST",
+    body: JSON.stringify({ ...body, parcel_id: parcelId }),
+  });
+}
+
+/** The export endpoint's URL. Fetched as a blob so the download keeps its filename. */
+export const scenarioExportUrl = (scenarioId: string) =>
+  `/scenario/${encodeURIComponent(scenarioId)}/export`;
+
 /** Re-underwrite with edited inputs (the 1c modal -> 1b panel round trip). */
 export function postUnderwrite(
   parcelId: string,

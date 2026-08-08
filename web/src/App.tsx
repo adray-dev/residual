@@ -19,6 +19,8 @@ import {
   getParcel,
   getUnderwrite,
   postUnderwrite,
+  saveScenario,
+  scenarioExportUrl,
 } from "./lib/api";
 import type { AssumptionSet, Meta, ParcelRecord, Underwrite } from "./lib/types";
 import { changeCount, type Overrides } from "./lib/assumptions";
@@ -60,6 +62,10 @@ export function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  // The scenario saved for the parcel currently open. Export needs one, because the file
+  // is the frozen record — not a re-serialisation of whatever the panel is showing.
+  const [scenarioId, setScenarioId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -124,6 +130,8 @@ export function App() {
     (parcelId: string) => {
       setDemolition(false);
       setOverrides({});
+      setScenarioId(null);
+      setSaveState("idle");
       setPanel({ kind: "loading" });
       run(parcelId, { overrides: {}, demolition: false })
         .then((data) => setPanel({ kind: "ready", data }))
@@ -160,6 +168,8 @@ export function App() {
       const parcelId = selection?.parcelId ?? selectedFromLink;
       if (!parcelId) return;
       setDemolition(next);
+      setScenarioId(null);
+      setSaveState("idle");
       setRerunning(true);
       run(parcelId, { overrides, demolition: next })
         .then((data) => setPanel({ kind: "ready", data }))
@@ -189,6 +199,11 @@ export function App() {
           setOverrides(next);
           setPanel({ kind: "ready", data });
           setModalOpen(false);
+          // The saved scenario froze the OLD inputs, so it no longer describes what is on
+          // screen. Exporting it here would hand someone a file that disagrees with the
+          // panel they were just looking at.
+          setScenarioId(null);
+          setSaveState("idle");
         })
         .catch((error: unknown) => {
           if (error instanceof NotModellable) setModalError(error.message);
@@ -212,6 +227,25 @@ export function App() {
       .then((data) => setPanel({ kind: "ready", data }))
       .catch((error: unknown) => setPanel(failed(error, false)));
   }, [selection?.parcelId, selectedFromLink, run, failed]);
+
+  /** Freeze the current underwrite. The server re-runs from these inputs and stores its
+   * own numbers, so what is saved is what the model said. */
+  const save = useCallback(() => {
+    const parcelId = selection?.parcelId ?? selectedFromLink;
+    if (!parcelId) return;
+    setSaveState("saving");
+    saveScenario(parcelId, { ...overrides, include_demolition: demolition })
+      .then((ref) => {
+        setScenarioId(ref.scenario_id);
+        setSaveState("saved");
+      })
+      .catch((error: unknown) => setPanel(failed(error, changeCount(overrides) > 0)));
+  }, [selection?.parcelId, selectedFromLink, overrides, demolition, failed]);
+
+  /** Download the frozen file. A plain navigation, so the server's filename is honoured. */
+  const exportScenario = useCallback(() => {
+    if (scenarioId) window.location.href = scenarioExportUrl(scenarioId);
+  }, [scenarioId]);
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
@@ -300,6 +334,9 @@ export function App() {
             busy={rerunning}
             onDemolitionChange={changeDemolition}
             onEditAssumptions={defaults ? () => setModalOpen(true) : undefined}
+            onSaveScenario={save}
+            onExport={scenarioId ? exportScenario : undefined}
+            saveState={saveState}
             onClose={closePanel}
           />
         )}
