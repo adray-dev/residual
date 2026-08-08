@@ -42,6 +42,8 @@ export interface InputsModalProps {
   displayName: string;
   confidence: number;
   busy: boolean;
+  /** Why the last re-underwrite was refused. The modal STAYS OPEN when this is set. */
+  error?: string | null;
   onApply: (overrides: Overrides) => void;
   onClose: () => void;
 }
@@ -54,6 +56,7 @@ export function InputsModal({
   displayName,
   confidence,
   busy,
+  error,
   onApply,
   onClose,
 }: InputsModalProps) {
@@ -179,6 +182,16 @@ export function InputsModal({
             </div>
           </div>
         </div>
+
+        {/* A refusal is shown HERE, with the inputs still on screen and still editable.
+            Closing the modal on a rejected run stranded the user: the panel explained why
+            the model would not run, and the values that caused it were no longer reachable
+            to fix. The edit that broke it and the message about it belong together. */}
+        {error && (
+          <div className={styles.error} role="alert">
+            <strong>These inputs cannot be modelled.</strong> {error}
+          </div>
+        )}
 
         <footer className={styles.foot}>
           <span className={styles.count}>

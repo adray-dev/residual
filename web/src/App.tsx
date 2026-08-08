@@ -36,7 +36,9 @@ type PanelState =
   | { kind: "closed" }
   | { kind: "loading" }
   | { kind: "ready"; data: Underwrite }
-  | { kind: "not-modellable"; reason: string }
+  // `fromEdits` marks a refusal the user caused and can undo. Without it the panel
+  // cannot tell "this parcel is a park" from "your exit cap broke the program".
+  | { kind: "not-modellable"; reason: string; fromEdits: boolean }
   | { kind: "error"; message: string };
 
 interface Selection {
@@ -56,6 +58,7 @@ export function App() {
   const [defaults, setDefaults] = useState<AssumptionSet | null>(null);
   const [overrides, setOverrides] = useState<Overrides>({});
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
@@ -92,11 +95,13 @@ export function App() {
 
   const dismiss = useCallback(() => setSelection(null), []);
 
-  const failed = useCallback((error: unknown) => {
+  const failed = useCallback((error: unknown, fromEdits: boolean): PanelState => {
     // A 422 is an answer about the parcel, not a fault — render the reason.
-    if (error instanceof NotModellable) return { kind: "not-modellable", reason: error.message } as const;
-    if (error instanceof ApiError) return { kind: "error", message: error.message } as const;
-    return { kind: "error", message: String(error) } as const;
+    if (error instanceof NotModellable) {
+      return { kind: "not-modellable", reason: error.message, fromEdits };
+    }
+    if (error instanceof ApiError) return { kind: "error", message: error.message };
+    return { kind: "error", message: String(error) };
   }, []);
 
   /** Run the full model on one parcel with a given set of inputs.
@@ -107,14 +112,11 @@ export function App() {
   const run = useCallback(
     (parcelId: string, next: { overrides: Overrides; demolition: boolean }) => {
       const edited = changeCount(next.overrides) > 0;
-      const request = edited
+      return edited
         ? postUnderwrite(parcelId, { ...next.overrides, include_demolition: next.demolition })
         : getUnderwrite(parcelId, { includeDemolition: next.demolition });
-      return request
-        .then((data) => setPanel({ kind: "ready", data }))
-        .catch((error: unknown) => setPanel(failed(error)));
     },
-    [failed],
+    [],
   );
 
   /** Open a parcel fresh: default inputs, as the bake ran it. */
@@ -123,9 +125,11 @@ export function App() {
       setDemolition(false);
       setOverrides({});
       setPanel({ kind: "loading" });
-      run(parcelId, { overrides: {}, demolition: false });
+      run(parcelId, { overrides: {}, demolition: false })
+        .then((data) => setPanel({ kind: "ready", data }))
+        .catch((error: unknown) => setPanel(failed(error, false)));
     },
-    [run],
+    [run, failed],
   );
 
   /** The deliberate step into the full model, from the popup. */
@@ -157,25 +161,57 @@ export function App() {
       if (!parcelId) return;
       setDemolition(next);
       setRerunning(true);
-      run(parcelId, { overrides, demolition: next }).finally(() => setRerunning(false));
+      run(parcelId, { overrides, demolition: next })
+        .then((data) => setPanel({ kind: "ready", data }))
+        // Demolition is itself an edit, so a refusal here is recoverable too.
+        .catch((error: unknown) => setPanel(failed(error, true)))
+        .finally(() => setRerunning(false));
     },
-    [selection?.parcelId, selectedFromLink, overrides, run],
+    [selection?.parcelId, selectedFromLink, overrides, run, failed],
   );
 
-  /** The 1c modal's "Re-underwrite parcel". */
+  /** The 1c modal's "Re-underwrite parcel".
+   *
+   * The modal closes ONLY when the run succeeds. A refusal keeps it open with the reason
+   * shown beneath the inputs that caused it, because the alternative — closing, and
+   * explaining the problem on a panel that no longer offers the fields — is a dead end. */
   const applyOverrides = useCallback(
     (next: Overrides) => {
       const parcelId = selection?.parcelId ?? selectedFromLink;
       if (!parcelId) return;
-      setOverrides(next);
+      setModalError(null);
       setRerunning(true);
-      run(parcelId, { overrides: next, demolition }).finally(() => {
-        setRerunning(false);
-        setModalOpen(false);
-      });
+      run(parcelId, { overrides: next, demolition })
+        .then((data) => {
+          // Committed only on success. Storing a rejected set would leave the app holding
+          // inputs that never ran: cancelling out of the modal would look like a recovery
+          // while the next demolition toggle silently re-sent the broken values.
+          setOverrides(next);
+          setPanel({ kind: "ready", data });
+          setModalOpen(false);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof NotModellable) setModalError(error.message);
+          else setPanel(failed(error, true));
+        })
+        .finally(() => setRerunning(false));
     },
-    [selection?.parcelId, selectedFromLink, demolition, run],
+    [selection?.parcelId, selectedFromLink, demolition, run, failed],
   );
+
+  /** Back to the inputs the bake ran, from anywhere — including a refusal panel. */
+  const resetToDefaults = useCallback(() => {
+    const parcelId = selection?.parcelId ?? selectedFromLink;
+    if (!parcelId) return;
+    setOverrides({});
+    setDemolition(false);
+    setModalError(null);
+    setModalOpen(false);
+    setPanel({ kind: "loading" });
+    run(parcelId, { overrides: {}, demolition: false })
+      .then((data) => setPanel({ kind: "ready", data }))
+      .catch((error: unknown) => setPanel(failed(error, false)));
+  }, [selection?.parcelId, selectedFromLink, run, failed]);
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
@@ -268,7 +304,19 @@ export function App() {
           />
         )}
         {panel.kind === "not-modellable" && (
-          <NotModellablePanel reason={panel.reason} onClose={closePanel} />
+          <NotModellablePanel
+            reason={panel.reason}
+            recovery={
+              panel.fromEdits
+                ? {
+                    onEditAssumptions: () => setModalOpen(true),
+                    onReset: resetToDefaults,
+                    changed: changeCount(overrides) + (demolition ? 1 : 0),
+                  }
+                : undefined
+            }
+            onClose={closePanel}
+          />
         )}
         {panel.kind === "loading" && (
           <div className={styles.panelState}>
@@ -282,17 +330,21 @@ export function App() {
         )}
       </main>
 
-      {modalOpen && defaults && meta && vocab && panel.kind === "ready" && (
+      {modalOpen && defaults && meta && vocab && panel.kind !== "loading" && (
         <InputsModal
           defaults={defaults}
           labels={meta.labels}
           vocab={vocab}
           overrides={overrides}
-          displayName={panel.data.display_name}
-          confidence={panel.data.confidence}
+          displayName={panel.kind === "ready" ? panel.data.display_name : "this parcel"}
+          confidence={panel.kind === "ready" ? panel.data.confidence : 0}
           busy={rerunning}
+          error={modalError}
           onApply={applyOverrides}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setModalError(null);
+          }}
         />
       )}
     </div>

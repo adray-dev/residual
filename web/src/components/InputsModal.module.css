@@ -247,6 +247,20 @@
   pointer-events: none;
 }
 
+/* --- refusal -------------------------------------------------------------- */
+/* Amber, not red: the model declining a combination of inputs is a finding about those
+   inputs, not a fault. The user has not broken anything — they have asked for a building
+   the zoning does not allow, and the fix is one field away. */
+.error {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  background: var(--amber-tint);
+  border-top: 1px solid rgba(192, 138, 62, 0.35);
+  color: var(--amber-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* --- footer --------------------------------------------------------------- */
 .foot {
   display: flex;

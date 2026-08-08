@@ -177,23 +177,34 @@ export function Drilldown({
   );
 }
 
-/** Shown where the panel's numbers would go when a parcel cannot be modelled at all.
+/** Shown where the panel's numbers would go when a parcel cannot be modelled.
  *
- * Exempt land, historic restriction, unencoded zoning. The server sends a plain-language
- * sentence and it is rendered verbatim — these are answers about the parcel, and dressing
- * one up as an error would tell the user the product is broken when it is working. */
+ * Two different situations land here, and conflating them is what made this a dead end.
+ *
+ *   - The PARCEL cannot be modelled: exempt, historic, zoning not yet encoded. Nothing the
+ *     user can change; the server's sentence is the whole answer.
+ *   - The user's INPUTS cannot be modelled: an edit pushed the program outside what zoning
+ *     allows. That is recoverable, and the panel has to say how — previously it explained
+ *     the refusal and then offered no route back to the values that caused it.
+ *
+ * `recovery` is what separates them. It is absent in the first case on purpose.
+ */
 export function NotModellablePanel({
   reason,
+  recovery,
   onClose,
 }: {
   reason: string;
+  recovery?: { onEditAssumptions: () => void; onReset: () => void; changed: number };
   onClose?: () => void;
 }) {
   return (
     <aside className={styles.panel} aria-label="Parcel underwriting">
       <header className={styles.header}>
         <div className={styles.headerTop}>
-          <div className={styles.address}>Not modelled</div>
+          <div className={styles.address}>
+            {recovery ? "These inputs cannot be modelled" : "Not modelled"}
+          </div>
           {onClose && (
             <button className={styles.iconButton} onClick={onClose} aria-label="Close panel">
               ×
@@ -202,9 +213,29 @@ export function NotModellablePanel({
         </div>
       </header>
       <div className={styles.state}>
-        <div className={styles.stateTitle}>This parcel has no underwriting</div>
+        <div className={styles.stateTitle}>
+          {recovery ? "The model was not run" : "This parcel has no underwriting"}
+        </div>
         {reason}
+        {recovery && (
+          <p className={styles.stateHint}>
+            {recovery.changed === 1
+              ? "One edited input put this parcel outside what its zoning allows."
+              : `${recovery.changed} edited inputs put this parcel outside what its zoning allows.`}{" "}
+            Change them back, or return to the default inputs.
+          </p>
+        )}
       </div>
+      {recovery && (
+        <footer className={styles.footer}>
+          <button className={styles.footerPrimary} onClick={recovery.onEditAssumptions}>
+            Edit assumptions
+          </button>
+          <button className={styles.footerSecondary} onClick={recovery.onReset}>
+            Reset to defaults
+          </button>
+        </footer>
+      )}
     </aside>
   );
 }

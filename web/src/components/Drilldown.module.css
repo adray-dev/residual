@@ -236,3 +236,14 @@
   color: var(--ink);
   margin-bottom: 6px;
 }
+
+.stateHint {
+  margin: 12px auto 0;
+  max-width: 40ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--amber-text);
+  background: var(--amber-tint);
+  border-radius: var(--r-input);
+  padding: 9px 11px;
+}
