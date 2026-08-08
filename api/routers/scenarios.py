@@ -6,6 +6,7 @@ the caller post its own figures would make it a record of what the client claime
 """
 from __future__ import annotations
 
+import io
 import json
 from datetime import datetime
 
@@ -13,8 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from api import scenarios as svc
+from api import workbook as wb
 from api.deps import current_batch, get_conn
-from api.schemas import ScenarioRef, ScenarioSaveRequest, ScenarioSummary
+from api.schemas import ExportRequest, ScenarioRef, ScenarioSaveRequest, ScenarioSummary
 from api.underwrite import UnderwriteError, underwrite
 from data import repositories as repo
 
@@ -43,6 +45,43 @@ def post_scenario(
     scenario_id = svc.save(conn, result, name=req.name)
     conn.commit()
     return ScenarioRef(scenario_id=scenario_id, parcel_id=req.parcel_id)
+
+
+@router.post("/export.xlsx")
+def post_export_xlsx(
+    req: ExportRequest,
+    conn=Depends(get_conn),
+    batch: datetime = Depends(current_batch),
+) -> Response:
+    """A live Excel workbook of the current inputs. Saving is NOT required.
+
+    The server re-runs the engine from the supplied inputs and builds the workbook from its
+    own result — never from numbers the client is holding. That is the property the
+    save-first flow used to provide, and it is preserved here without the saved row: the
+    file records what the MODEL computed, and its Assumptions tab states exactly the inputs
+    it was computed from, so it still stands on its own.
+    """
+    try:
+        result = underwrite(
+            conn,
+            req.parcel_id,
+            batch,
+            prototype_id=req.prototype_id,
+            overrides=req.overrides(),
+            include_demolition=req.include_demolition,
+        )
+    except UnderwriteError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    buffer = io.BytesIO()
+    wb.build(result).save(buffer)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "content-disposition": f'attachment; filename="{wb.filename_for(result)}"'
+        },
+    )
 
 
 @router.get("/scenarios", response_model=list[ScenarioSummary])

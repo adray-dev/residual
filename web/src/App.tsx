@@ -20,7 +20,7 @@ import {
   getUnderwrite,
   postUnderwrite,
   saveScenario,
-  scenarioExportUrl,
+  exportWorkbook,
 } from "./lib/api";
 import type { AssumptionSet, Meta, ParcelRecord, Underwrite } from "./lib/types";
 import { changeCount, type Overrides } from "./lib/assumptions";
@@ -62,10 +62,11 @@ export function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
-  // The scenario saved for the parcel currently open. Export needs one, because the file
-  // is the frozen record — not a re-serialisation of whatever the panel is showing.
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
+  // Whether the panel's current inputs have been saved as a scenario. Export no longer
+  // depends on this — it re-runs server-side — but "Saved ✓" must stop claiming a save
+  // that no longer describes what is on screen.
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [exporting, setExporting] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -130,7 +131,6 @@ export function App() {
     (parcelId: string) => {
       setDemolition(false);
       setOverrides({});
-      setScenarioId(null);
       setSaveState("idle");
       setPanel({ kind: "loading" });
       run(parcelId, { overrides: {}, demolition: false })
@@ -168,7 +168,6 @@ export function App() {
       const parcelId = selection?.parcelId ?? selectedFromLink;
       if (!parcelId) return;
       setDemolition(next);
-      setScenarioId(null);
       setSaveState("idle");
       setRerunning(true);
       run(parcelId, { overrides, demolition: next })
@@ -202,7 +201,6 @@ export function App() {
           // The saved scenario froze the OLD inputs, so it no longer describes what is on
           // screen. Exporting it here would hand someone a file that disagrees with the
           // panel they were just looking at.
-          setScenarioId(null);
           setSaveState("idle");
         })
         .catch((error: unknown) => {
@@ -235,17 +233,22 @@ export function App() {
     if (!parcelId) return;
     setSaveState("saving");
     saveScenario(parcelId, { ...overrides, include_demolition: demolition })
-      .then((ref) => {
-        setScenarioId(ref.scenario_id);
-        setSaveState("saved");
-      })
+      .then(() => setSaveState("saved"))
       .catch((error: unknown) => setPanel(failed(error, changeCount(overrides) > 0)));
   }, [selection?.parcelId, selectedFromLink, overrides, demolition, failed]);
 
-  /** Download the frozen file. A plain navigation, so the server's filename is honoured. */
+  /** Download a live Excel workbook of what is on screen. No save required.
+   *
+   * The server re-runs the model from these inputs and builds the file from its own
+   * output, so the workbook cannot disagree with the panel. */
   const exportScenario = useCallback(() => {
-    if (scenarioId) window.location.href = scenarioExportUrl(scenarioId);
-  }, [scenarioId]);
+    const parcelId = selection?.parcelId ?? selectedFromLink;
+    if (!parcelId) return;
+    setExporting(true);
+    exportWorkbook(parcelId, { ...overrides, include_demolition: demolition })
+      .catch((error: unknown) => setPanel(failed(error, changeCount(overrides) > 0)))
+      .finally(() => setExporting(false));
+  }, [selection?.parcelId, selectedFromLink, overrides, demolition, failed]);
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
@@ -335,7 +338,8 @@ export function App() {
             onDemolitionChange={changeDemolition}
             onEditAssumptions={defaults ? () => setModalOpen(true) : undefined}
             onSaveScenario={save}
-            onExport={scenarioId ? exportScenario : undefined}
+            onExport={exportScenario}
+            exporting={exporting}
             saveState={saveState}
             onClose={closePanel}
           />

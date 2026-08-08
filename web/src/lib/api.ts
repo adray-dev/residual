@@ -127,9 +127,44 @@ export function saveScenario(
   });
 }
 
-/** The export endpoint's URL. Fetched as a blob so the download keeps its filename. */
+/** The saved scenario's JSON export URL. */
 export const scenarioExportUrl = (scenarioId: string) =>
   `/scenario/${encodeURIComponent(scenarioId)}/export`;
+
+/** Download a live Excel workbook of the CURRENT inputs. No saved scenario needed.
+ *
+ * The server re-runs the engine and builds the file from its own result, so this can never
+ * become a spreadsheet of numbers the client was holding. Saving is still available for a
+ * scenario worth keeping; it is just not a precondition for getting a workbook. */
+export async function exportWorkbook(
+  parcelId: string,
+  body: UnderwriteRequest,
+): Promise<void> {
+  const response = await fetch("/export.xlsx", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...body, parcel_id: parcelId }),
+  });
+  if (!response.ok) {
+    const message = await failure(response);
+    if (response.status === 422) throw new NotModellable(message);
+    throw new ApiError(message, response.status);
+  }
+
+  // The filename is the server's — it is built from the address, and rebuilding it here
+  // would be a second place for that rule to drift.
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = match?.[1] ?? "residual-export.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 /** Re-underwrite with edited inputs (the 1c modal -> 1b panel round trip). */
 export function postUnderwrite(

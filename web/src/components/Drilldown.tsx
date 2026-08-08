@@ -78,6 +78,7 @@ export function Drilldown({
   onEditAssumptions,
   onSaveScenario,
   onExport,
+  exporting = false,
   saveState = "idle",
   onClose,
 }: {
@@ -90,6 +91,8 @@ export function Drilldown({
   onEditAssumptions?: () => void;
   onSaveScenario?: () => void;
   onExport?: () => void;
+  /** A workbook build is in flight — it re-runs the model server-side. */
+  exporting?: boolean;
   /** "Saved" / "Saving…" — transient feedback on the footer's save button. */
   saveState?: "idle" | "saving" | "saved";
   onClose?: () => void;
@@ -182,15 +185,16 @@ export function Drilldown({
         >
           {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save scenario"}
         </button>
-        {/* Export needs a saved scenario to export — the file is the frozen record, not a
-            re-serialisation of whatever the panel happens to be showing. */}
+        {/* No save required. The server re-runs the model from the current inputs and
+            builds the workbook from its own output, so the file always agrees with this
+            panel without a scenario row having to exist first. */}
         <button
           className={styles.footerSecondary}
           onClick={onExport}
-          disabled={!onExport || busy}
-          title={onExport ? "Download the saved scenario" : "Save the scenario first"}
+          disabled={!onExport || busy || exporting}
+          title="Download a live Excel workbook of these inputs"
         >
-          Export
+          {exporting ? "Building…" : "Export to Excel"}
         </button>
       </footer>
     </aside>

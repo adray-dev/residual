@@ -337,6 +337,16 @@ class ScenarioSaveRequest(UnderwriteRequest):
     name: str | None = None
 
 
+class ExportRequest(UnderwriteRequest):
+    """Export from the CURRENT inputs, with no saved scenario required.
+
+    Inherits the underwrite input surface for the same reason `ScenarioSaveRequest` does:
+    the server re-runs the model from these and builds the workbook from its own output, so
+    an export can never become a record of numbers the client supplied.
+    """
+    parcel_id: str
+
+
 class ScenarioRef(BaseModel):
     scenario_id: str
     parcel_id: str
