@@ -1,16 +1,18 @@
-/** App shell.
+/** App shell: the map, the legend, and the drill-down rail.
  *
- * The map is the next slice; until it lands, parcels are picked from a plain list off
- * /map/query so the drill-down can be exercised against real baked data. The list is
- * deliberately not dressed up to look like a map — a fake map would be harder to tell
- * apart from a broken one.
+ * The batch is resolved exactly once, by /meta, and everything downstream is pinned to
+ * what it returned — the tileset URL it names and the rows it counted. That is the whole
+ * point of that endpoint: if the map and the panel each resolved "latest bake"
+ * independently, a bake landing between the two calls would leave them showing different
+ * numbers for the same parcel with nothing on screen to reveal it.
  */
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, NotModellable, getMapQuery, getMeta, getUnderwrite } from "./lib/api";
-import type { Meta, ParcelRow, Underwrite } from "./lib/types";
+import { ApiError, NotModellable, getMeta, getUnderwrite } from "./lib/api";
+import type { Meta, Underwrite } from "./lib/types";
 import { Vocabulary } from "./lib/vocabulary";
-import { money } from "./lib/format";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
+import { Legend } from "./components/Legend";
+import { MapView } from "./components/MapView";
 import styles from "./App.module.css";
 
 type PanelState =
@@ -22,21 +24,18 @@ type PanelState =
 
 export function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [rows, setRows] = useState<ParcelRow[]>([]);
+  const [objective, setObjective] = useState<string>("rlv_total");
   const [selected, setSelected] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelState>({ kind: "empty" });
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    Promise.all([
-      getMeta(),
-      getMapQuery({ statuses: ["scored"], limit: 60, sort_dir: "desc" }),
-    ])
-      .then(([metaResponse, query]) => {
+    getMeta()
+      .then((response) => {
         if (!live) return;
-        setMeta(metaResponse);
-        setRows(query.rows);
+        setMeta(response);
+        setObjective(response.default_objective);
       })
       .catch((error: unknown) => {
         if (live) setBootError(error instanceof Error ? error.message : String(error));
@@ -63,12 +62,16 @@ export function App() {
       });
   }, []);
 
+  const close = useCallback(() => {
+    setPanel({ kind: "empty" });
+    setSelected(null);
+  }, []);
+
   if (bootError) {
     return (
       <div className={styles.shell}>
-        <div className={`${styles.panelState} ${styles.error}`} style={{ width: "100%" }}>
-          {bootError}
-          <br />
+        <div className={styles.boot}>
+          <div className={styles.error}>{bootError}</div>
           Is the API running? <code>uvicorn api.main:app --reload</code>
         </div>
       </div>
@@ -91,42 +94,45 @@ export function App() {
       </header>
 
       <main className={styles.main}>
-        <div className={styles.picker}>
-          <div className={styles.pickerHead}>
-            {rows.length
-              ? `Top ${rows.length} by feasibility value — the map replaces this list.`
-              : "Loading parcels…"}
-          </div>
-          <div className={styles.rows}>
-            {rows.map((row) => (
-              <button
-                key={row.parcel_id}
-                className={`${styles.row} ${selected === row.parcel_id ? styles.active : ""}`}
-                onClick={() => open(row.parcel_id)}
-              >
-                <span className={styles.rowName}>{row.display_name}</span>
-                <span className={styles.rowMeta}>{row.ward}</span>
-                <span className={styles.rowValue}>{money(row.rlv_total)}</span>
-              </button>
-            ))}
-          </div>
+        <div className={styles.mapArea}>
+          {meta?.tileset_url ? (
+            <MapView
+              tilesetUrl={meta.tileset_url}
+              objective={objective}
+              selectedId={selected}
+              onSelect={open}
+            />
+          ) : (
+            // /meta returns null rather than a stale tileset when tiles have not been
+            // built for THIS batch. Better an honest gap than a map quietly drawn from
+            // the previous bake's numbers.
+            <div className={styles.boot}>
+              {meta
+                ? "No tiles have been built for the current bake."
+                : "Loading…"}
+              {meta && (
+                <>
+                  <br />
+                  <code>python -m tiles.build_tiles</code>
+                </>
+              )}
+            </div>
+          )}
+          {meta && vocab && (
+            <Legend
+              meta={meta}
+              vocab={vocab}
+              objective={objective}
+              onObjectiveChange={setObjective}
+            />
+          )}
         </div>
 
         {panel.kind === "ready" && vocab && (
-          <Drilldown
-            data={panel.data}
-            vocab={vocab}
-            onClose={() => {
-              setPanel({ kind: "empty" });
-              setSelected(null);
-            }}
-          />
+          <Drilldown data={panel.data} vocab={vocab} onClose={close} />
         )}
         {panel.kind === "not-modellable" && (
-          <NotModellablePanel
-            reason={panel.reason}
-            onClose={() => setPanel({ kind: "empty" })}
-          />
+          <NotModellablePanel reason={panel.reason} onClose={close} />
         )}
         {panel.kind === "loading" && (
           <div className={styles.panelState}>
@@ -134,9 +140,6 @@ export function App() {
             <br />
             This is the levered, monthly, IRR-solved tier — it takes a moment.
           </div>
-        )}
-        {panel.kind === "empty" && (
-          <div className={styles.panelState}>Select a parcel to underwrite it.</div>
         )}
         {panel.kind === "error" && (
           <div className={`${styles.panelState} ${styles.error}`}>{panel.message}</div>
