@@ -41,6 +41,8 @@ export function App() {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [panel, setPanel] = useState<PanelState>({ kind: "closed" });
+  const [demolition, setDemolition] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,24 +77,42 @@ export function App() {
 
   const dismiss = useCallback(() => setSelection(null), []);
 
+  const failed = useCallback((error: unknown) => {
+    // A 422 is an answer about the parcel, not a fault — render the reason.
+    if (error instanceof NotModellable) return { kind: "not-modellable", reason: error.message } as const;
+    if (error instanceof ApiError) return { kind: "error", message: error.message } as const;
+    return { kind: "error", message: String(error) } as const;
+  }, []);
+
   /** The deliberate step into the full model. */
   const openFull = useCallback(() => {
     const parcelId = selection?.parcelId;
     if (!parcelId) return;
+    setDemolition(false); // a fresh parcel starts from the default, as the bake ran it
     setPanel({ kind: "loading" });
     getUnderwrite(parcelId)
       .then((data) => setPanel({ kind: "ready", data }))
-      .catch((error: unknown) => {
-        // A 422 is an answer about the parcel, not a fault — render the reason.
-        if (error instanceof NotModellable) {
-          setPanel({ kind: "not-modellable", reason: error.message });
-        } else if (error instanceof ApiError) {
-          setPanel({ kind: "error", message: error.message });
-        } else {
-          setPanel({ kind: "error", message: String(error) });
-        }
-      });
-  }, [selection?.parcelId]);
+      .catch((error: unknown) => setPanel(failed(error)));
+  }, [selection?.parcelId, failed]);
+
+  /** Demolition re-runs the whole model, so every figure in the panel moves with it.
+   *
+   * The previous result stays on screen while the new one is in flight rather than being
+   * replaced by a spinner: the old numbers are still true for the old toggle state, and
+   * blanking a dense panel for a second of work reads as a fault. */
+  const changeDemolition = useCallback(
+    (next: boolean) => {
+      const parcelId = selection?.parcelId;
+      if (!parcelId) return;
+      setDemolition(next);
+      setRerunning(true);
+      getUnderwrite(parcelId, { includeDemolition: next })
+        .then((data) => setPanel({ kind: "ready", data }))
+        .catch((error: unknown) => setPanel(failed(error)))
+        .finally(() => setRerunning(false));
+    },
+    [selection?.parcelId, failed],
+  );
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
@@ -174,7 +194,14 @@ export function App() {
         </div>
 
         {panel.kind === "ready" && vocab && (
-          <Drilldown data={panel.data} vocab={vocab} onClose={closePanel} />
+          <Drilldown
+            data={panel.data}
+            vocab={vocab}
+            demolition={demolition}
+            busy={rerunning}
+            onDemolitionChange={changeDemolition}
+            onClose={closePanel}
+          />
         )}
         {panel.kind === "not-modellable" && (
           <NotModellablePanel reason={panel.reason} onClose={closePanel} />

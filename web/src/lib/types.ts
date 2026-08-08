@@ -227,7 +227,8 @@ export interface SourcesUses {
 
 export interface CashFlowOut {
   months: number;
-  phase_bounds: Record<string, [number, number]>;
+  /** Month index at which each phase ENDS: predev_end, construction_end, stabilization, sale. */
+  phase_bounds: Record<string, number>;
   land: number[];
   hard_cost: number[];
   soft_cost: number[];

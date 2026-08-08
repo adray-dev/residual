@@ -9,6 +9,9 @@ import type { Vocabulary } from "../lib/vocabulary";
 import { PARCEL_ID_LABEL } from "../lib/vocabulary";
 import { confidence, count, money, percent } from "../lib/format";
 import { MetricGrid } from "./MetricGrid";
+import { ProgramCard } from "./ProgramCard";
+import { SCurve } from "./SCurve";
+import { SourcesUses } from "./SourcesUses";
 import styles from "./Drilldown.module.css";
 
 /** Below this the handoff shows a "Low confidence · default inputs" chip (amber tint). */
@@ -69,10 +72,17 @@ function Hero({ data, vocab }: { data: Underwrite; vocab: Vocabulary }) {
 export function Drilldown({
   data,
   vocab,
+  demolition,
+  busy = false,
+  onDemolitionChange,
   onClose,
 }: {
   data: Underwrite;
   vocab: Vocabulary;
+  demolition: boolean;
+  /** A re-underwrite is in flight; the panel still shows the previous, valid numbers. */
+  busy?: boolean;
+  onDemolitionChange: (next: boolean) => void;
   onClose?: () => void;
 }) {
   const lot = data.lot_area_sf ? `${count(data.lot_area_sf)} SF lot` : null;
@@ -122,7 +132,39 @@ export function Drilldown({
             {count(data.envelope.max_footprint_sf)} SF footprint.
           </span>
         </div>
+
+        <div className={styles.charts}>
+          <section>
+            <div className={`micro-label ${styles.chartTitle}`}>Cost draw</div>
+            <SCurve cashflow={data.cashflow} />
+          </section>
+          <section>
+            <div className={`micro-label ${styles.chartTitle}`}>Sources &amp; uses</div>
+            <SourcesUses data={data.sources_uses} />
+          </section>
+        </div>
+
+        <ProgramCard
+          program={data.program}
+          vocab={vocab}
+          existingBuildingSf={data.developability.existing_building_sf}
+          demolition={demolition}
+          busy={busy}
+          onDemolitionChange={onDemolitionChange}
+        />
       </div>
+
+      <footer className={styles.footer}>
+        <button className={styles.footerPrimary} disabled>
+          Edit assumptions &amp; re-underwrite
+        </button>
+        <button className={styles.footerSecondary} disabled>
+          Save scenario
+        </button>
+        <button className={styles.footerSecondary} disabled>
+          Export
+        </button>
+      </footer>
     </aside>
   );
 }

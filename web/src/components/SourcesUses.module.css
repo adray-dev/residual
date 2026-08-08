@@ -1,0 +1,68 @@
+.group + .group {
+  margin-top: 12px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.total {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--ink-60);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 74px 1fr 52px;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.label {
+  font-size: 10.5px;
+  color: var(--ink-60);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The track is the group total, so every bar in a group shares one baseline and one
+   scale — bar lengths are comparable down the column and across the two groups. */
+.track {
+  height: 13px;
+  background: var(--canvas);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 3px;
+  min-width: 2px;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--ink);
+  text-align: right;
+}
+
+/* Sources and uses are the same money counted two ways, so they must agree. When they do
+   not, the model is wrong and the chart would be a confident picture of a bug. */
+.unbalanced {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--amber-text);
+  background: var(--amber-tint);
+  border-radius: var(--r-input);
+  padding: 8px 10px;
+}

@@ -160,6 +160,55 @@
   color: var(--amber-text);
 }
 
+/* --- charts --------------------------------------------------------------- */
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.chartTitle {
+  margin-bottom: 9px;
+}
+
+/* --- footer --------------------------------------------------------------- */
+.footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-alt);
+  flex-shrink: 0;
+}
+
+.footerPrimary {
+  flex: 1;
+  border: 0;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: var(--r-button);
+}
+
+.footerSecondary {
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: var(--r-button);
+}
+
+/* These three are the next slice (the 1c modal, /scenario, export). Disabled rather than
+   absent so the panel's real shape is visible, and dimmed enough to read as not-yet. */
+.footer button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 /* --- states --------------------------------------------------------------- */
 .state {
   padding: 40px 22px;
