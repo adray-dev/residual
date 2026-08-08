@@ -98,6 +98,15 @@ export function MapView({
     });
     map.current = instance;
 
+    // MapLibre reports source and tile failures through an `error` event; with no listener
+    // they are easy to miss entirely. Surfacing them is worth the four lines.
+    instance.on("error", (event) => {
+      console.error("[map]", event.error?.message ?? event);
+    });
+    if (import.meta.env.DEV) {
+      (window as unknown as { map?: maplibregl.Map }).map = instance;
+    }
+
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
 
     instance.on("load", () => {

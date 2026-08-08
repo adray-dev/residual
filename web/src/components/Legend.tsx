@@ -11,11 +11,15 @@ import { money, rate } from "../lib/format";
 import { LEGEND_GRADIENT, OBJECTIVE_METRIC, STATUS_COLORS } from "../lib/mapStyle";
 import styles from "./Legend.module.css";
 
-/** Chrome copy for the segmented control, which is 236px wide and cannot hold the full
- * metric names ("Financial feasibility (RLV)"). The handoff specifies these exact short
- * forms for this control; the full served label rides along as the title attribute. */
+/** Chrome copy for the segmented control, which cannot hold the full metric names
+ * ("Financial feasibility (RLV)"). The full served label rides along as the title.
+ *
+ * The handoff's control has two segments; this one has three, because /meta advertises a
+ * third objective. At the handoff's 236px these ellipsised to "Total val…" and
+ * "vs. asses…", so the copy is shortened and the panel widened to 264px rather than
+ * shipping two truncated labels — a legend nobody can read is worse than a wider legend. */
 const SEGMENT_COPY: Record<string, string> = {
-  rlv_total: "Total value",
+  rlv_total: "Total",
   rlv_per_buildable_sf: "Per SF",
   gap: "vs. assessed",
 };
