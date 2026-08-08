@@ -1,0 +1,91 @@
+/* Design tokens — transcribed from the handoff's token tables, not eyeballed from the
+   screenshots. The handoff is explicit that its color, type, and spacing are intentional,
+   so these are the only place raw hex or px type sizes are allowed to appear; components
+   reference the variables.
+
+   The product is a light-surface desktop tool (the handoff pins a 1440x900 canvas and
+   ships no dark palette), so this deliberately does not define a dark theme. */
+
+:root {
+  /* --- color: accent ------------------------------------------------------ */
+  --accent: #0e7c7b;          /* logo, primary buttons, RLV values, active states */
+  --accent-dark: #0a5250;     /* text on light-teal chip backgrounds */
+  --accent-mid: #4fa39d;
+  --accent-mid-2: #2c918c;
+  --accent-tint: #eaf2f1;     /* selected chips, "best" tags */
+
+  /* --- color: ink --------------------------------------------------------- */
+  --ink: #1a1d1c;             /* primary text, dark buttons, selection ring */
+  --ink-80: #3d3b37;
+  --ink-60: #5c5952;          /* body text, table secondary values */
+  --ink-40: #8a8781;          /* labels, captions, inactive tabs */
+  --ink-25: #a5a29b;          /* placeholder, helper text */
+
+  /* --- color: surface ----------------------------------------------------- */
+  --surface: #ffffff;
+  --surface-alt: #faf9f6;     /* zebra rows, footers, sidebars */
+  --canvas: #f4f2ed;          /* map base, inputs, neutral chips */
+  --canvas-deep: #efede9;
+
+  --hairline: rgba(0, 0, 0, 0.07);
+  --hairline-strong: rgba(0, 0, 0, 0.12);
+
+  /* --- color: semantic ---------------------------------------------------- */
+  --amber: #c08a3e;           /* equity series, confidence bar */
+  --amber-tint: #fbf0e4;
+  --amber-text: #8a5a21;
+  --slate: #3e6e93;
+  --slate-tint: #e9eef4;
+  --slate-text: #2d5473;
+  --positive: #2e6b3c;
+  --negative: #a5452f;
+
+  /* --- map value ramp (8 stops, low -> high feasibility) ------------------- */
+  --ramp-1: #edeae4;
+  --ramp-2: #dce9e6;
+  --ramp-3: #bedcd7;
+  --ramp-4: #93c9c3;
+  --ramp-5: #5faea8;
+  --ramp-6: #2c918c;
+  --ramp-7: #0e7c7b;
+  --ramp-8: #0a5250;
+  --ramp-gradient: linear-gradient(90deg, #edeae4, #cfe3e0, #93c9c3, #4fa39d, #0e7c7b, #0a5250);
+
+  /* --- map status colors -------------------------------------------------- */
+  /* Deliberately outside the value ramp so unscored land never reads as "low value". */
+  --status-infeasible: #9c968b;
+  --status-exempt: #c3cbce;
+  --status-exempt-alt: #d6dcde;
+  --status-historic: #b0779a;
+  --status-not-covered: #ffffff;
+  --status-not-covered-border: #9a958c;
+
+  /* --- typography --------------------------------------------------------- */
+  /* The sans/mono split is load-bearing: anything a user compares across rows is mono
+     so the digits align; anything they read as prose is sans. */
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- radius ------------------------------------------------------------- */
+  --r-check: 3px;
+  --r-tag: 5px;
+  --r-input: 6px;
+  --r-button: 7px;
+  --r-control: 8px;
+  --r-inner-card: 9px;
+  --r-panel: 11px;
+  --r-modal: 13px;
+  --r-pill: 14px;
+
+  /* --- shadow ------------------------------------------------------------- */
+  --sh-floating: 0 6px 24px rgba(0, 0, 0, 0.11);
+  --sh-popup: 0 10px 34px rgba(0, 0, 0, 0.19);
+  --sh-panel: -8px 0 30px rgba(0, 0, 0, 0.1);
+  --sh-modal: 0 26px 70px rgba(0, 0, 0, 0.32);
+  --sh-map-control: 0 2px 10px rgba(0, 0, 0, 0.09);
+  --sh-card: 0 2px 10px rgba(0, 0, 0, 0.07);
+
+  /* --- layout ------------------------------------------------------------- */
+  --topbar-h: 64px;
+  --panel-w: 620px;           /* 1b right rail; comfortable range 440-760 */
+}

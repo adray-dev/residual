@@ -1,0 +1,177 @@
+/* The 1b right rail. Fixed width (620px default, 440-760 comfortable), full height under
+   the top bar, with the left hairline and shadow that lift it off the map. */
+.panel {
+  width: var(--panel-w);
+  min-width: 440px;
+  max-width: 760px;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--hairline-strong);
+  box-shadow: var(--sh-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- header --------------------------------------------------------------- */
+.header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.address {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  flex: 1;
+  min-width: 0;
+}
+
+.identity {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-40);
+  margin-top: 5px;
+}
+
+.iconButton {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-button);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-60);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.iconButton:hover {
+  background: var(--canvas);
+}
+
+/* --- tags ----------------------------------------------------------------- */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tag {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--ink-60);
+  white-space: nowrap;
+}
+
+.tag.accent {
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+}
+
+.tag.amber {
+  background: var(--amber-tint);
+  color: var(--amber-text);
+}
+
+/* --- body ----------------------------------------------------------------- */
+.body {
+  padding: 18px 22px 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* --- hero ----------------------------------------------------------------- */
+.hero {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.heroValue {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.heroAside {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink-60);
+}
+
+/* The two-tier disclosure. SPEC 11 accepts that the screening and full numbers diverge,
+   and requires the UI to label the difference rather than hide it. */
+.tierNote {
+  font-size: 11.5px;
+  color: var(--ink-40);
+  line-height: 1.45;
+}
+
+.tierNote b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--ink-60);
+}
+
+/* --- callouts ------------------------------------------------------------- */
+.callout {
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-inner-card);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface-alt);
+}
+
+.callout.warn {
+  background: var(--amber-tint);
+  border-color: rgba(192, 138, 62, 0.35);
+}
+
+.calloutText {
+  font-size: 12.5px;
+  color: var(--ink-60);
+  line-height: 1.45;
+}
+
+.callout.warn .calloutText {
+  color: var(--amber-text);
+}
+
+/* --- states --------------------------------------------------------------- */
+.state {
+  padding: 40px 22px;
+  text-align: center;
+  color: var(--ink-40);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stateTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}

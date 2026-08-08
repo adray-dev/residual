@@ -1,0 +1,55 @@
+/* 4 columns x 2 rows. The 1px gaps show the container's background through as hairlines,
+   which is how the handoff draws the dividers — one border-box, not eight bordered cells,
+   so there are no doubled or missing lines at the seams. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--hairline-strong);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-inner-card);
+  overflow: hidden;
+}
+
+.cell {
+  background: var(--surface);
+  padding: 11px 12px 12px;
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  /* .micro-label carries the mono/uppercase/tracking; only the color differs here. */
+  color: var(--ink-40);
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+/* A value the engine declined to produce reads as absent, not as a small number. */
+.value.missing {
+  color: var(--ink-25);
+}
+
+/* The basis line under a value. Sans, not mono: it is prose about the number, and making
+   it mono would let it read as another figure. */
+.note {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: var(--ink-40);
+  margin-top: -1px;
+}
+
+.note.warning {
+  color: var(--amber-text);
+}
