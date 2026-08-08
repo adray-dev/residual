@@ -1,0 +1,137 @@
+<!doctype html>
+<!--
+  Phase 3 verification page — NOT part of the app.
+
+  A bare MapLibre + PMTiles harness to confirm the tileset renders real DC parcel
+  geometry with the diverging ramp and the four status shades. The real client is built
+  in web/; this file exists so the tile build can be verified on its own, before any
+  application code depends on it.
+
+  Serve the repo root and open /tiles/verify.html:
+      uvicorn api.main:app --reload      (serves /tiles/* from tiles/build)
+      python -m http.server 8080         (serves this file)
+-->
+<meta charset="utf-8">
+<title>Tile verification — parcel feasibility</title>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 1; width: 260px;
+    background: #fff; border-radius: 10px; padding: 14px 16px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.11); font-size: 12.5px; line-height: 1.5;
+  }
+  h1 { font-size: 13px; margin: 0 0 8px; letter-spacing: -.2px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  .sw { width: 13px; height: 13px; border-radius: 2px; border: 1px solid rgba(255,255,255,.85); }
+  code { font-family: ui-monospace, monospace; font-size: 11px; }
+  #stat { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,.08); color: #5C5952; }
+</style>
+
+<div id="map"></div>
+<div id="panel">
+  <h1>Tile verification</h1>
+  <div id="legend"></div>
+  <div id="stat">loading…</div>
+</div>
+
+<script>
+// The diverging ramp: the handoff's 8 teal stops split around zero. Negative bins take a
+// muted warm arm so land that does not pencil never reads as merely "low value".
+const NEGATIVE = { '-4': '#8C5A4A', '-3': '#A97A66', '-2': '#C6A18C', '-1': '#E0C9B8' };
+const POSITIVE = { '1': '#DCE9E6', '2': '#93C9C3', '3': '#2C918C', '4': '#0A5250' };
+const STATUS = {
+  infeasible: '#9C968B',
+  exempt: '#C3CBCE',
+  historic: '#B0779A',
+  zone_not_encoded: '#FFFFFF',
+};
+
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile);
+
+async function main() {
+  const meta = await (await fetch('http://127.0.0.1:8000/meta')).json();
+  if (!meta.tileset_available) {
+    document.getElementById('stat').textContent = 'No tileset for the current batch.';
+    return;
+  }
+  const url = 'http://127.0.0.1:8000' + meta.tileset_url;
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: { version: 8, sources: {}, layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': '#F4F2ED' } },
+    ]},
+    center: [-77.0369, 38.9072],
+    zoom: 11,
+  });
+
+  // Colour by the baked bin: a pure lookup, no division and no server call (SPEC §9/§10).
+  const fill = ['case',
+    ['==', ['get', 'status'], 'scored'],
+      ['match', ['to-string', ['get', 'bin']],
+        ...Object.entries({ ...NEGATIVE, ...POSITIVE }).flat(), '#EDEAE4'],
+    ['match', ['get', 'status'],
+      ...Object.entries(STATUS).flat(), '#EDEAE4'],
+  ];
+
+  map.on('load', () => {
+    map.addSource('parcels', { type: 'vector', url: 'pmtiles://' + url });
+    map.addLayer({
+      id: 'parcel-fill', type: 'fill', source: 'parcels', 'source-layer': 'parcels',
+      paint: { 'fill-color': fill, 'fill-opacity': 0.95 },
+    });
+    map.addLayer({
+      id: 'parcel-line', type: 'line', source: 'parcels', 'source-layer': 'parcels',
+      paint: { 'line-color': 'rgba(255,255,255,.85)', 'line-width': 0.5 },
+    });
+    // Zoning-not-covered reads as a dashed outline rather than a fill.
+    map.addLayer({
+      id: 'parcel-uncovered', type: 'line', source: 'parcels', 'source-layer': 'parcels',
+      filter: ['==', ['get', 'status'], 'zone_not_encoded'],
+      paint: { 'line-color': '#9A958C', 'line-width': 1.2, 'line-dasharray': [2, 2] },
+    });
+
+    map.on('idle', () => {
+      const shown = map.queryRenderedFeatures({ layers: ['parcel-fill'] });
+      const scored = shown.filter(f => f.properties.status === 'scored').length;
+      document.getElementById('stat').innerHTML =
+        `batch <code>${meta.computed_at.slice(0, 19)}</code><br>` +
+        `${meta.parcel_count.toLocaleString()} parcels in bake<br>` +
+        `${shown.length.toLocaleString()} rendered here (${scored.toLocaleString()} scored)`;
+    });
+
+    map.on('click', 'parcel-fill', (e) => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup({ closeButton: true })
+        .setLngLat(e.lngLat)
+        .setHTML(`<code>${p.id}</code><br>${p.status}` +
+          (p.rlv !== undefined ? `<br>RLV ${Math.round(p.rlv).toLocaleString()}<br>bin ${p.bin}` : ''))
+        .addTo(map);
+    });
+  });
+
+  const legend = document.getElementById('legend');
+  const swatch = (color, label, dashed) => {
+    const style = dashed
+      ? `background:#fff;border:1.5px dashed #9A958C`
+      : `background:${color}`;
+    return `<div class="row"><span class="sw" style="${style}"></span>${label}</div>`;
+  };
+  legend.innerHTML =
+    '<div style="font-weight:600;margin:6px 0 4px">Does not pencil</div>' +
+    Object.entries(NEGATIVE).reverse().map(([b, c]) => swatch(c, `bin ${b}`)).join('') +
+    '<div style="font-weight:600;margin:8px 0 4px">Feasible</div>' +
+    Object.entries(POSITIVE).map(([b, c]) => swatch(c, `bin ${b}`)).join('') +
+    '<div style="font-weight:600;margin:8px 0 4px">Not scored</div>' +
+    swatch(STATUS.infeasible, 'Infeasible under zoning') +
+    swatch(STATUS.exempt, 'Public / exempt') +
+    swatch(STATUS.historic, 'Historic — restricted') +
+    swatch(null, 'Zoning not yet covered', true);
+}
+main();
+</script>

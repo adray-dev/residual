@@ -622,6 +622,37 @@ def objective_ramp(
     }
 
 
+def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> Iterator[dict]:
+    """Stream geometry + the best bake row per parcel, for the tile build (SPEC §10).
+
+    Server-side cursor: 132,632 MultiPolygons will not fit comfortably in memory.
+
+    Geometry is repaired on the way out. 19 DC parcels carry self-intersecting rings, and
+    tippecanoe's behaviour on invalid input is not something to leave to chance — but the
+    stored geometry is NOT rewritten, because the loader is the only thing that should own
+    what is in the table. `was_invalid` reports how many needed it so a sudden jump is
+    visible rather than silent.
+    """
+    with conn.cursor(name="map_geojson_scan") as cur:
+        cur.itersize = batch_size
+        cur.execute(
+            """SELECT b.ssl, b.prototype_id, b.status, b.rlv_total, b.rlv_per_buildable_sf,
+                      b.feasibility_gap, b.confidence,
+                      NOT ST_IsValid(p.parcel_geom) AS was_invalid,
+                      ST_Area(p.parcel_geom::geography) AS area_m2,
+                      ST_AsGeoJSON(
+                          ST_MakeValid(p.parcel_geom), 6
+                      ) AS geometry
+                 FROM bake_results b JOIN parcels p USING (ssl)
+                WHERE b.computed_at = %s AND b.is_best
+                  AND p.parcel_geom IS NOT NULL
+                ORDER BY b.ssl""",
+            (computed_at,),
+        )
+        for row in cur:
+            yield row
+
+
 def list_submarkets(conn) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute("SELECT submarket_id, name FROM submarkets ORDER BY submarket_id")
