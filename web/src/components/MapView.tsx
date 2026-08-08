@@ -11,7 +11,10 @@
  * attribute (the parcel identifier the build already writes in place of "SSL").
  */
 import { useEffect, useRef } from "react";
-import maplibregl, { type MapGeoJSONFeature } from "maplibre-gl";
+import maplibregl, {
+  type FilterSpecification,
+  type MapGeoJSONFeature,
+} from "maplibre-gl";
 import { PMTiles, Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -35,10 +38,22 @@ export interface MapViewProps {
   tilesetUrl: string;
   objective: string;
   selectedId: string | null;
-  onSelect: (parcelId: string) => void;
+  /** Parcels NOT matching this are dimmed, not hidden. Null means no filter. */
+  filter: FilterSpecification | null;
+  /** Fires with the parcel id and its screen position, so a popup can anchor to it. */
+  onSelect: (parcelId: string, at: { x: number; y: number }) => void;
+  /** Clicking bare canvas dismisses the popup. */
+  onSelectNothing: () => void;
 }
 
-export function MapView({ tilesetUrl, objective, selectedId, onSelect }: MapViewProps) {
+export function MapView({
+  tilesetUrl,
+  objective,
+  selectedId,
+  filter,
+  onSelect,
+  onSelectNothing,
+}: MapViewProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const hovered = useRef<string | null>(null);
@@ -46,6 +61,8 @@ export function MapView({ tilesetUrl, objective, selectedId, onSelect }: MapView
   // callback instead of the one captured at mount.
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onSelectNothingRef = useRef(onSelectNothing);
+  onSelectNothingRef.current = onSelectNothing;
 
   useEffect(() => {
     if (!container.current) return;
@@ -156,6 +173,18 @@ export function MapView({ tilesetUrl, objective, selectedId, onSelect }: MapView
         },
       });
 
+      // Filtered-OUT parcels are veiled in canvas colour rather than removed. Hiding two
+      // thirds of the city leaves the matches floating with no street grid to locate them
+      // against; dimming keeps the context and still reads instantly as "not these".
+      instance.addLayer({
+        id: "parcels-dim",
+        type: "fill",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["literal", false],
+        paint: { "fill-color": "#f4f2ed", "fill-opacity": 0.76 },
+      });
+
       // brightness(1.08) has no MapLibre equivalent, so hover composites white at 8% —
       // which is what that filter does to these fills.
       instance.addLayer({
@@ -250,7 +279,8 @@ export function MapView({ tilesetUrl, objective, selectedId, onSelect }: MapView
     instance.on("click", (event) => {
       const [feature] = instance.queryRenderedFeatures(event.point, { layers: pickable });
       const id = feature ? featureId(feature) : null;
-      if (id) onSelectRef.current(id);
+      if (id) onSelectRef.current(id, { x: event.point.x, y: event.point.y });
+      else onSelectNothingRef.current();
     });
 
     return () => {
@@ -269,6 +299,22 @@ export function MapView({ tilesetUrl, objective, selectedId, onSelect }: MapView
     if (!instance?.isStyleLoaded() || !instance.getLayer("parcels-value")) return;
     instance.setPaintProperty("parcels-value", "fill-color", valueRamp(objective));
   }, [objective]);
+
+  // Filtering is a layer filter, not a refetch — the attributes are already in the tile.
+  // The dim layer takes the NEGATION, so it veils exactly what the filter excludes.
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    const apply = () => {
+      if (!instance.getLayer("parcels-dim")) return;
+      instance.setFilter(
+        "parcels-dim",
+        filter ? (["!", filter] as FilterSpecification) : (["literal", false] as FilterSpecification),
+      );
+    };
+    if (instance.isStyleLoaded()) apply();
+    else instance.once("load", apply);
+  }, [filter]);
 
   // Selection is owned by the app (the panel and the map must agree), so the map follows
   // the prop rather than holding its own copy.

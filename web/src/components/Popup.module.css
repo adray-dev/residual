@@ -1,0 +1,174 @@
+/* Anchored over the selected parcel and pulled up above it, per the handoff:
+   width 300, translate(-50%,-100%), clamped so it never leaves the viewport. */
+.popup {
+  position: absolute;
+  width: 300px;
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
+  background: var(--surface);
+  border-radius: var(--r-panel);
+  box-shadow: var(--sh-popup);
+  z-index: 3;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 13px 14px 11px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+}
+
+.address {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.identity {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-40);
+  margin-top: 3px;
+}
+
+.close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-40);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+
+.close:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.rule {
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* --- headline ------------------------------------------------------------- */
+.value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.valueMain {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.valuePer {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--ink-60);
+}
+
+/* A non-scored parcel gets the status sentence where the number would be, in the quiet
+   neutral voice the handoff uses — unscored land must never read as bad land. */
+.statusLine {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--ink-60);
+  line-height: 1.45;
+}
+
+/* --- key/value rows ------------------------------------------------------- */
+.rows {
+  padding: 2px 0;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.rowLabel {
+  color: var(--ink-40);
+  flex-shrink: 0;
+}
+
+.rowValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- actions -------------------------------------------------------------- */
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+.primary {
+  flex: 1;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 9px 12px;
+  border-radius: var(--r-button);
+}
+
+.primary:hover {
+  background: var(--accent-dark);
+}
+
+.primary:disabled {
+  background: var(--ink-25);
+  cursor: default;
+}
+
+.secondary {
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 9px 12px;
+  border-radius: var(--r-button);
+}
+
+.secondary:hover {
+  background: var(--canvas);
+}
+
+.loading {
+  padding: 22px 14px;
+  text-align: center;
+  color: var(--ink-25);
+  font-size: 12.5px;
+}

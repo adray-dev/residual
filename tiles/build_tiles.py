@@ -135,6 +135,12 @@ def build_features(conn, batch: datetime, report: TileReport):
             # tile attributes are visible in the client and in devtools.
             "id": row["ssl"],
             "status": status,
+            # The geography filter is client-side over tile attributes (SPEC §10), so the
+            # ward has to travel in the tile — there is no other way to grey out eight
+            # wards' worth of parcels without a round trip. This is the raw
+            # `submarket_id` ("ward_6"), matching what /meta's submarket list keys on;
+            # the UI shows that list's `name`.
+            "ward": row["submarket_id"],
             "proto": row["prototype_id"] if row["prototype_id"] != repo.NONE_PROTOTYPE else None,
             "rlv": row["rlv_total"],
             "rlv_sf": row["rlv_per_buildable_sf"],

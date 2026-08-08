@@ -102,6 +102,66 @@ export interface MapQuery {
   irr_filter_applied: boolean;
 }
 
+export interface ZoningInfo {
+  zone_code: string | null;
+  district_code: string | null;
+  /** False when the district is not yet in `zoning_rules` — the map's dashed status. */
+  encoded: boolean;
+  max_far: number | null;
+  max_height_ft: number | null;
+  max_stories: number | null;
+  lot_occupancy_pct: Record<string, number> | null;
+  permitted_uses: string[] | null;
+  parking_ratio: Record<string, number> | null;
+  requires_ground_floor_active: boolean | null;
+  matter_of_right: boolean | null;
+}
+
+/** One prototype's screening result — the "Try another prototype" list. */
+export interface PrototypeResult {
+  prototype_id: string;
+  is_best: boolean;
+  screening_rlv: number | null;
+  rlv_per_buildable_sf: number | null;
+  feasibility_gap: number | null;
+  noi: number | null;
+  total_development_cost: number | null;
+  yield_on_cost: number | null;
+  profit_margin: number | null;
+  exit_value: number | null;
+  gross_sf: number | null;
+  net_rentable_sf: number | null;
+  unit_count: number | null;
+  floors: number | null;
+  binding_constraint: string | null;
+  binding_constraint_label: string | null;
+  confidence: number | null;
+}
+
+/** The record read behind the 1a popup. Screening tier — the engine does not run. */
+export interface ParcelRecord {
+  computed_at: string;
+  parcel_id: string;
+  address: string | null;
+  neighborhood: string | null;
+  display_name: string;
+  ward: string | null;
+  lot_area_sf: number | null;
+  land_value: number | null;
+  improvement_value: number | null;
+  improvement_ratio: number | null;
+  land_use_code: string | null;
+  is_exempt: boolean;
+  is_historic: boolean;
+  status: string;
+  status_label: string;
+  developability: Developability;
+  zoning: ZoningInfo;
+  prototypes: PrototypeResult[];
+  best_prototype_id: string | null;
+  confidence: number | null;
+}
+
 export interface ProgramOut {
   prototype_id: string;
   construction_type: string;

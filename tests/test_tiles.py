@@ -94,6 +94,7 @@ def _row(ssl, status="scored", **overrides):
         "rlv_per_buildable_sf": 42.0,
         "feasibility_gap": 150_000.0,
         "confidence": 0.7,
+        "submarket_id": "ward_6",
         "was_invalid": False,
         "area_m2": 500.0,
         "geometry": '{"type":"Polygon","coordinates":[[[0,0],[0,1],[1,1],[0,0]]]}',
@@ -126,9 +127,16 @@ def fake_scan(monkeypatch):
 def test_the_tile_carries_exactly_the_documented_attributes(fake_scan):
     features, _ = fake_scan([_row("0123    0456")])
     assert features[0]["properties"].keys() == {
-        "id", "status", "proto", "rlv", "rlv_sf", "gap", "conf",
+        "id", "status", "ward", "proto", "rlv", "rlv_sf", "gap", "conf",
         "bin", "bin_sf", "bin_gap",
     }
+
+
+def test_the_ward_travels_so_geography_filters_need_no_round_trip(fake_scan):
+    """SPEC §10 puts the geography filter client-side. It carries the raw submarket_id,
+    which is what /meta's submarket list keys on — the UI renders that list's name."""
+    features, _ = fake_scan([_row("A", submarket_id="ward_6")])
+    assert features[0]["properties"]["ward"] == "ward_6"
 
 
 def test_ssl_never_appears_in_a_tile(fake_scan):

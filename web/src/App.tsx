@@ -1,32 +1,46 @@
-/** App shell: the map, the legend, and the drill-down rail.
+/** App shell: map, filters, legend, popup, and the drill-down rail.
  *
  * The batch is resolved exactly once, by /meta, and everything downstream is pinned to
- * what it returned — the tileset URL it names and the rows it counted. That is the whole
+ * what it returned — the tileset URL it names and the ramps it computed. That is the whole
  * point of that endpoint: if the map and the panel each resolved "latest bake"
  * independently, a bake landing between the two calls would leave them showing different
  * numbers for the same parcel with nothing on screen to reveal it.
+ *
+ * Clicking a parcel is deliberately cheap. It reads the record (`/parcel/{id}`, a bake
+ * lookup) and shows the popup; the levered monthly model only runs when the user asks for
+ * it. Triage has to stay instant or the map stops being usable for finding anything.
  */
-import { useCallback, useEffect, useState } from "react";
-import { ApiError, NotModellable, getMeta, getUnderwrite } from "./lib/api";
-import type { Meta, Underwrite } from "./lib/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiError, NotModellable, getMeta, getParcel, getUnderwrite } from "./lib/api";
+import type { Meta, ParcelRecord, Underwrite } from "./lib/types";
 import { Vocabulary } from "./lib/vocabulary";
+import { EMPTY_FILTERS, mapFilter, type FilterState } from "./lib/filters";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
+import { Filters } from "./components/Filters";
 import { Legend } from "./components/Legend";
 import { MapView } from "./components/MapView";
+import { Popup } from "./components/Popup";
 import styles from "./App.module.css";
 
 type PanelState =
-  | { kind: "empty" }
+  | { kind: "closed" }
   | { kind: "loading" }
   | { kind: "ready"; data: Underwrite }
   | { kind: "not-modellable"; reason: string }
   | { kind: "error"; message: string };
 
+interface Selection {
+  parcelId: string;
+  at: { x: number; y: number };
+  record: ParcelRecord | null;
+}
+
 export function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [objective, setObjective] = useState<string>("rlv_total");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [panel, setPanel] = useState<PanelState>({ kind: "empty" });
+  const [objective, setObjective] = useState("rlv_total");
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [panel, setPanel] = useState<PanelState>({ kind: "closed" });
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,13 +59,31 @@ export function App() {
     };
   }, []);
 
-  const open = useCallback((parcelId: string) => {
-    setSelected(parcelId);
+  /** Map click: show the popup immediately, fill in the record when it lands. */
+  const select = useCallback((parcelId: string, at: { x: number; y: number }) => {
+    setSelection({ parcelId, at, record: null });
+    setPanel({ kind: "closed" });
+    getParcel(parcelId)
+      .then((record) =>
+        // Ignore a response for a parcel the user has already clicked away from.
+        setSelection((current) =>
+          current?.parcelId === parcelId ? { ...current, record } : current,
+        ),
+      )
+      .catch(() => setSelection((current) => (current?.parcelId === parcelId ? null : current)));
+  }, []);
+
+  const dismiss = useCallback(() => setSelection(null), []);
+
+  /** The deliberate step into the full model. */
+  const openFull = useCallback(() => {
+    const parcelId = selection?.parcelId;
+    if (!parcelId) return;
     setPanel({ kind: "loading" });
     getUnderwrite(parcelId)
       .then((data) => setPanel({ kind: "ready", data }))
       .catch((error: unknown) => {
-        // A 422 is an answer about the parcel, not a fault — render the reason, not an error.
+        // A 422 is an answer about the parcel, not a fault — render the reason.
         if (error instanceof NotModellable) {
           setPanel({ kind: "not-modellable", reason: error.message });
         } else if (error instanceof ApiError) {
@@ -60,12 +92,12 @@ export function App() {
           setPanel({ kind: "error", message: String(error) });
         }
       });
-  }, []);
+  }, [selection?.parcelId]);
 
-  const close = useCallback(() => {
-    setPanel({ kind: "empty" });
-    setSelected(null);
-  }, []);
+  const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
+
+  const filter = useMemo(() => mapFilter(filters), [filters]);
+  const vocab = useMemo(() => (meta ? new Vocabulary(meta.labels) : null), [meta]);
 
   if (bootError) {
     return (
@@ -77,8 +109,6 @@ export function App() {
       </div>
     );
   }
-
-  const vocab = meta ? new Vocabulary(meta.labels) : null;
 
   return (
     <div className={styles.shell}>
@@ -99,17 +129,17 @@ export function App() {
             <MapView
               tilesetUrl={meta.tileset_url}
               objective={objective}
-              selectedId={selected}
-              onSelect={open}
+              selectedId={selection?.parcelId ?? null}
+              filter={filter}
+              onSelect={select}
+              onSelectNothing={dismiss}
             />
           ) : (
             // /meta returns null rather than a stale tileset when tiles have not been
             // built for THIS batch. Better an honest gap than a map quietly drawn from
             // the previous bake's numbers.
             <div className={styles.boot}>
-              {meta
-                ? "No tiles have been built for the current bake."
-                : "Loading…"}
+              {meta ? "No tiles have been built for the current bake." : "Loading…"}
               {meta && (
                 <>
                   <br />
@@ -118,21 +148,36 @@ export function App() {
               )}
             </div>
           )}
+
           {meta && vocab && (
-            <Legend
-              meta={meta}
+            <>
+              <Filters meta={meta} vocab={vocab} state={filters} onChange={setFilters} />
+              <Legend
+                meta={meta}
+                vocab={vocab}
+                objective={objective}
+                onObjectiveChange={setObjective}
+              />
+            </>
+          )}
+
+          {selection && vocab && (
+            <Popup
+              at={selection.at}
+              record={selection.record}
               vocab={vocab}
-              objective={objective}
-              onObjectiveChange={setObjective}
+              busy={panel.kind === "loading"}
+              onOpenFull={openFull}
+              onClose={dismiss}
             />
           )}
         </div>
 
         {panel.kind === "ready" && vocab && (
-          <Drilldown data={panel.data} vocab={vocab} onClose={close} />
+          <Drilldown data={panel.data} vocab={vocab} onClose={closePanel} />
         )}
         {panel.kind === "not-modellable" && (
-          <NotModellablePanel reason={panel.reason} onClose={close} />
+          <NotModellablePanel reason={panel.reason} onClose={closePanel} />
         )}
         {panel.kind === "loading" && (
           <div className={styles.panelState}>

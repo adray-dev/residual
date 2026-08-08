@@ -1,5 +1,5 @@
 /** The HTTP client. Every network call the app makes goes through here. */
-import type { MapQuery, Meta, Underwrite, UnderwriteRequest } from "./types";
+import type { MapQuery, Meta, ParcelRecord, Underwrite, UnderwriteRequest } from "./types";
 
 /** A 422 from the underwrite endpoint is an answer ABOUT the parcel, not a fault.
  *
@@ -75,6 +75,14 @@ export function getMapQuery(
     else query.set(key, String(value));
   }
   return request<MapQuery>(`/map/query?${query}`, { signal });
+}
+
+/** The parcel record: everything the popup shows, with no engine run behind it.
+ *
+ * This is the screening tier, so it stays fast enough to fire on every map click. The
+ * full model is a separate, deliberate step the user takes from the popup. */
+export function getParcel(parcelId: string, signal?: AbortSignal): Promise<ParcelRecord> {
+  return request<ParcelRecord>(parcelPath(parcelId), { signal });
 }
 
 /** Default-assumption underwrite. Cached server-side, so reopening a parcel is free. */

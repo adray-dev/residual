@@ -651,7 +651,7 @@ def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> It
         cur.itersize = batch_size
         cur.execute(
             """SELECT b.ssl, b.prototype_id, b.status, b.rlv_total, b.rlv_per_buildable_sf,
-                      b.feasibility_gap, b.confidence,
+                      b.feasibility_gap, b.confidence, p.submarket_id,
                       NOT ST_IsValid(p.parcel_geom) AS was_invalid,
                       ST_Area(p.parcel_geom::geography) AS area_m2,
                       ST_AsGeoJSON(
