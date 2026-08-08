@@ -87,6 +87,12 @@ class Labels(BaseModel):
     binding_constraint: dict[str, str]
     status: dict[str, str]
     tier: dict[str, str]
+    # The 1c inputs modal. `assumption_kind` carries the unit each input is expressed in
+    # (percent / money / months / years / rate / number) so the client can render 0.2 as
+    # 20% and read an edit back the same way.
+    assumption_group: dict[str, str]
+    assumption: dict[str, str]
+    assumption_kind: dict[str, str]
 
 
 class Limits(BaseModel):

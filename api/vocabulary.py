@@ -110,6 +110,72 @@ STATUS_LABELS: dict[str, str] = {
     "zone_not_encoded": "Zoning not yet covered",
 }
 
+# --- assumption inputs (the 1c modal) ---------------------------------------
+# Group headings, in the modal's nav order.
+ASSUMPTION_GROUP_LABELS: dict[str, str] = {
+    "timeline": "Timeline",
+    "cost": "Cost",
+    "revenue": "Revenue",
+    "debt": "Debt",
+    "exit": "Exit & return",
+    "envelope": "Envelope",
+}
+
+# Per-input plain label AND unit kind. The kind is here rather than in the client because
+# it is a fact about what the number MEANS: `soft_cost_pct` is 0.2 on the wire and must be
+# shown and typed as 20%, and getting that wrong silently changes a user's model by 100x.
+#
+# Keys mirror `engine/assumptions.py` exactly. Anything the engine does not accept is
+# absent — notably hard cost per SF, which the handoff's mock lists under Cost but which is
+# MARKET data (per construction type), not an assumption. Offering an input the engine
+# would ignore is worse than not offering it.
+#
+# kind: percent (0-1 fraction) | money | months | years | rate ($ per unit) | number
+ASSUMPTION_FIELDS: dict[str, tuple[str, str]] = {
+    # timeline
+    "predevelopment_months":            ("Predevelopment",            "months"),
+    "construction_months":              ("Construction",              "months"),
+    "leaseup_months":                   ("Lease-up",                  "months"),
+    "hold_after_stabilization_months":  ("Hold after stabilization",  "months"),
+    # cost
+    "soft_cost_pct":                    ("Soft cost % of hard",       "percent"),
+    "contingency_pct":                  ("Contingency",               "percent"),
+    "cost_escalation_annual":           ("Cost escalation",           "percent"),
+    "demo_cost_psf":                    ("Demolition $/SF",           "rate"),
+    # revenue
+    "rent_psf_residential_monthly":     ("Base rent $/SF/mo",         "rate"),
+    "stabilized_occupancy":             ("Occupancy",                 "percent"),
+    "opex_ratio":                       ("Operating expense ratio",   "percent"),
+    "rent_growth_annual":               ("Rent growth",               "percent"),
+    # debt
+    "construction_ltc":                 ("Construction LTC",          "percent"),
+    "construction_annual_rate":         ("Construction rate",         "percent"),
+    "perm_ltv":                         ("Permanent LTV",             "percent"),
+    "perm_annual_rate":                 ("Permanent rate",            "percent"),
+    "perm_amortization_years":          ("Amortization",              "years"),
+    "perm_min_dscr":                    ("Minimum DSCR",              "number"),
+    # exit & return
+    "exit_cap_rate":                    ("Exit cap rate",             "percent"),
+    "selling_cost_pct":                 ("Selling cost",              "percent"),
+    "target_developer_margin":          ("Target margin",             "percent"),
+    "discount_rate":                    ("Discount rate",             "percent"),
+    "irr_hurdle":                       ("Return hurdle",             "percent"),
+    # envelope
+    "floor_to_floor_residential_ft":    ("Floor to floor, residential", "number"),
+    "floor_to_floor_ground_retail_ft":  ("Floor to floor, ground retail", "number"),
+}
+
+# Inputs the modal must NOT show, with the reason.
+HIDDEN_ASSUMPTION_KEYS: frozenset[str] = frozenset({
+    # Owned by the 1b demolition toggle. Two controls for one value would let the panel
+    # and the modal disagree about what was actually run.
+    "include_demolition",
+    # A per-parking-type mapping, not a scalar; the modal's field is a single number and
+    # there is no product need to edit stall costs by type yet.
+    "parking_cost_per_stall",
+})
+
+
 # --- the two tiers ---------------------------------------------------------
 # SPEC §11: screening RLV (unlevered, margin-based) and full RLV (levered, IRR-based) WILL
 # diverge. That is accepted and must be labeled, never hidden — the drill-down shows both.

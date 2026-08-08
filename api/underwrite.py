@@ -33,6 +33,39 @@ UNDERWRITE_USE = Use.RESIDENTIAL
 # excluded: it is stamped by the prototype at fit time, not user-supplied as a flat dict.
 OVERRIDABLE_GROUPS = ("timeline", "cost", "revenue", "debt", "exit", "envelope")
 
+# Assumption keys the pro forma reads off MarketData rather than off Assumptions.
+#
+# `engine/proforma.py` takes the exit cap and the residential rent from the submarket's
+# MarketData row (SPEC §2.8 — a market row overrides the national default), so editing
+# these in the assumption set alone changes NOTHING: the run reports the override as
+# applied and returns identical numbers. They are also the two most important sensitivity
+# levers in the product, so hiding them is not an option either.
+#
+# An explicit per-parcel edit therefore wins over the market row. That is the whole premise
+# of the inputs modal — "model this parcel at a 5% cap" has to mean it. The market row
+# stays the default; only a value the user actually changed displaces it.
+#
+# `{assumption group: {assumption key: MarketData field}}`.
+MARKET_BACKED_INPUTS = {
+    "exit": {"exit_cap_rate": "exit_cap_rate"},
+    "revenue": {"rent_psf_residential_monthly": "rent_psf_residential_monthly"},
+}
+
+
+def apply_market_overrides(market, applied: dict):
+    """Return a MarketData with any user-edited market-backed inputs substituted in.
+
+    A copy, never a mutation: `repo.get_market` results are shared, and rewriting one would
+    leak one request's what-if into every later parcel in the same submarket.
+    """
+    substitutions = {
+        field: applied[group][key]
+        for group, keys in MARKET_BACKED_INPUTS.items()
+        for key, field in keys.items()
+        if key in applied.get(group, {})
+    }
+    return replace(market, **substitutions) if substitutions else market
+
 
 class UnderwriteError(Exception):
     """The parcel cannot be underwritten, with a reason fit to show a user."""
@@ -147,6 +180,8 @@ def underwrite(
     market = repo.get_market(conn, parcel.submarket_id)
     if market is None:
         raise UnderwriteError(f"No market data for submarket {parcel.submarket_id}.")
+    # An explicit edit to a market-backed input (exit cap, rent) displaces the market row.
+    market = apply_market_overrides(market, applied)
 
     try:
         envelope = resolve_envelope(parcel, rules, UNDERWRITE_USE, assumptions)

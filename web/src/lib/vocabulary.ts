@@ -51,6 +51,22 @@ export class Vocabulary {
   tier(key: string): string {
     return this.lookup("tier", key);
   }
+
+  /** "Exit & return" for `exit` — the 1c modal's group headings. */
+  assumptionGroup(key: string): string {
+    return this.lookup("assumption_group", key);
+  }
+
+  /** "Soft cost % of hard" for `soft_cost_pct`. */
+  assumption(key: string): string {
+    return this.lookup("assumption", key);
+  }
+
+  /** The unit an input is expressed in — percent / money / months / years / rate / number.
+   * Declared by the server because it is a fact about the value, not a styling choice. */
+  assumptionKind(key: string): string {
+    return this.labels.assumption_kind?.[key] ?? "number";
+  }
 }
 
 /** The one label the UI must never render, guarded so it cannot be reintroduced by hand.

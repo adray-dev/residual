@@ -11,6 +11,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+from api import vocabulary as vocab
 from data import repositories as repo
 
 pytestmark = pytest.mark.skipif(
@@ -59,6 +60,7 @@ def test_meta_serves_the_vocabulary_so_the_client_keeps_no_copy(meta):
     assert set(labels) == {
         "metric", "prototype", "construction", "parking",
         "binding_constraint", "status", "tier",
+        "assumption_group", "assumption", "assumption_kind",
     }
     # The handoff's language rules, spot-checked.
     assert labels["metric"]["irr"] == "Annual return"
@@ -70,6 +72,42 @@ def test_meta_serves_the_vocabulary_so_the_client_keeps_no_copy(meta):
         "screening": "Screening estimate",
         "full": "Full underwriting",
     }
+
+
+def test_every_editable_assumption_is_labelled_and_has_a_unit(meta, client):
+    """The 1c modal is driven by /assumptions/default, so every key it will render needs a
+    label and a unit kind. A key with a value but no unit would be shown raw — and `0.2`
+    presented where `20%` was meant is a 100x error in the user's model, silently."""
+    labels = meta["labels"]
+    defaults = client.get("/assumptions/default").json()
+
+    for group in ("timeline", "cost", "revenue", "debt", "exit", "envelope"):
+        assert group in labels["assumption_group"], group
+        for key, value in defaults[group].items():
+            if key in vocab.HIDDEN_ASSUMPTION_KEYS:
+                assert key not in labels["assumption"], f"{key} is hidden but also labelled"
+                continue
+            assert key in labels["assumption"], f"{group}.{key} has no label"
+            assert key in labels["assumption_kind"], f"{group}.{key} has no unit kind"
+            # A labelled input must be a scalar the modal can put in one field.
+            assert isinstance(value, (int, float)) and not isinstance(value, bool), key
+
+    assert set(labels["assumption"]) == set(labels["assumption_kind"])
+    assert set(labels["assumption_kind"].values()) <= {
+        "percent", "money", "months", "years", "rate", "number"
+    }
+
+
+def test_no_labelled_assumption_is_one_the_engine_would_ignore(meta, client):
+    """`build_assumptions` drops unknown keys silently. An input offered in the modal that
+    the engine then ignores looks like the model disagreeing with the user."""
+    defaults = client.get("/assumptions/default").json()
+    known = {
+        key
+        for group in ("timeline", "cost", "revenue", "debt", "exit", "envelope")
+        for key in defaults[group]
+    }
+    assert set(meta["labels"]["assumption"]) <= known
 
 
 def test_meta_never_says_ssl_anywhere_in_user_facing_text(meta):

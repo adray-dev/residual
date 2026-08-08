@@ -1,5 +1,12 @@
 /** The HTTP client. Every network call the app makes goes through here. */
-import type { MapQuery, Meta, ParcelRecord, Underwrite, UnderwriteRequest } from "./types";
+import type {
+  AssumptionSet,
+  MapQuery,
+  Meta,
+  ParcelRecord,
+  Underwrite,
+  UnderwriteRequest,
+} from "./types";
 
 /** A 422 from the underwrite endpoint is an answer ABOUT the parcel, not a fault.
  *
@@ -57,6 +64,11 @@ const parcelPath = (parcelId: string) => `/parcel/${encodeURIComponent(parcelId)
 
 export function getMeta(): Promise<Meta> {
   return request<Meta>("/meta");
+}
+
+/** SPEC section 2's defaults, which the 1c modal is generated from. Fetched once at boot. */
+export function getDefaultAssumptions(): Promise<AssumptionSet> {
+  return request<AssumptionSet>("/assumptions/default");
 }
 
 /** The table/compare read. Never runs the engine — it is a straight read of the bake.

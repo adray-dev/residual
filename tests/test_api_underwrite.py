@@ -289,3 +289,49 @@ def test_market_snapshot_is_stamped_for_scenario_freezing(underwriting):
     for key in ("submarket_id", "rent_psf_residential_monthly", "exit_cap_rate",
                 "hard_cost_psf", "as_of", "source"):
         assert key in snapshot, key
+
+
+# ---------------------------------------------------------------------------
+# market-backed inputs (the 1c modal's two most important levers)
+# ---------------------------------------------------------------------------
+def test_editing_the_exit_cap_actually_changes_the_model(client, scored):
+    """`proforma` reads the exit cap off MarketData, not off Assumptions, so overriding it
+    in the assumption set alone reported "1 input changed" and returned byte-identical
+    numbers. An input that says it applied and does nothing is worse than no input."""
+    base = client.get(f"/parcel/{scored}/underwrite").json()
+    tighter = client.post(
+        f"/parcel/{scored}/underwrite",
+        json={"exit": {"exit_cap_rate": round(base["assumptions"]["exit"]["exit_cap_rate"] - 0.01, 4)}},
+    ).json()
+
+    assert tighter["overrides_changed"] == 1
+    # A lower cap capitalises the same NOI into a larger exit value, and more residual.
+    assert tighter["returns"]["exit_value"] > base["returns"]["exit_value"]
+    assert tighter["feasibility_value"]["full"] > base["feasibility_value"]["full"]
+
+
+def test_editing_the_rent_actually_changes_the_model(client, scored):
+    """Same trap as the exit cap: rent is market-supplied (SPEC §2.8)."""
+    base = client.get(f"/parcel/{scored}/underwrite").json()
+    richer = client.post(
+        f"/parcel/{scored}/underwrite",
+        json={"revenue": {"rent_psf_residential_monthly":
+                          round(base["program"]["rent_psf_monthly"] + 1.0, 4)}},
+    ).json()
+
+    assert richer["overrides_changed"] == 1
+    assert richer["returns"]["noi"] > base["returns"]["noi"]
+    assert richer["feasibility_value"]["full"] > base["feasibility_value"]["full"]
+
+
+def test_a_market_override_does_not_leak_into_the_next_parcel(client, scored):
+    """`get_market` hands back a shared row; substituting on it rather than on a copy would
+    make one user's what-if the whole submarket's reality for the rest of the process."""
+    before = client.get(f"/parcel/{scored}/underwrite").json()
+    client.post(
+        f"/parcel/{scored}/underwrite",
+        json={"exit": {"exit_cap_rate": 0.03}},
+    )
+    after = client.get(f"/parcel/{scored}/underwrite").json()
+    assert after["feasibility_value"]["full"] == before["feasibility_value"]["full"]
+    assert after["overrides_changed"] == 0

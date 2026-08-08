@@ -11,8 +11,18 @@
  * it. Triage has to stay instant or the map stops being usable for finding anything.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, NotModellable, getMeta, getParcel, getUnderwrite } from "./lib/api";
-import type { Meta, ParcelRecord, Underwrite } from "./lib/types";
+import {
+  ApiError,
+  NotModellable,
+  getDefaultAssumptions,
+  getMeta,
+  getParcel,
+  getUnderwrite,
+  postUnderwrite,
+} from "./lib/api";
+import type { AssumptionSet, Meta, ParcelRecord, Underwrite } from "./lib/types";
+import { changeCount, type Overrides } from "./lib/assumptions";
+import { InputsModal } from "./components/InputsModal";
 import { Vocabulary } from "./lib/vocabulary";
 import { EMPTY_FILTERS, mapFilter, type FilterState } from "./lib/filters";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
@@ -43,16 +53,20 @@ export function App() {
   const [panel, setPanel] = useState<PanelState>({ kind: "closed" });
   const [selectedFromLink, setSelectedFromLink] = useState<string | null>(null);
   const [demolition, setDemolition] = useState(false);
+  const [defaults, setDefaults] = useState<AssumptionSet | null>(null);
+  const [overrides, setOverrides] = useState<Overrides>({});
+  const [modalOpen, setModalOpen] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    getMeta()
-      .then((response) => {
+    Promise.all([getMeta(), getDefaultAssumptions()])
+      .then(([response, assumptions]) => {
         if (!live) return;
         setMeta(response);
         setObjective(response.default_objective);
+        setDefaults(assumptions);
       })
       .catch((error: unknown) => {
         if (live) setBootError(error instanceof Error ? error.message : String(error));
@@ -85,16 +99,33 @@ export function App() {
     return { kind: "error", message: String(error) } as const;
   }, []);
 
-  /** Run the full model on one parcel and show it in the panel. */
-  const underwrite = useCallback(
-    (parcelId: string) => {
-      setDemolition(false); // a fresh parcel starts from the default, as the bake ran it
-      setPanel({ kind: "loading" });
-      getUnderwrite(parcelId)
+  /** Run the full model on one parcel with a given set of inputs.
+   *
+   * GET when nothing is overridden, POST otherwise. That is not a style choice: the
+   * default-assumption run is a pure function of parcel and batch, so it stays a cacheable,
+   * linkable GET, and only an edited run needs a body. */
+  const run = useCallback(
+    (parcelId: string, next: { overrides: Overrides; demolition: boolean }) => {
+      const edited = changeCount(next.overrides) > 0;
+      const request = edited
+        ? postUnderwrite(parcelId, { ...next.overrides, include_demolition: next.demolition })
+        : getUnderwrite(parcelId, { includeDemolition: next.demolition });
+      return request
         .then((data) => setPanel({ kind: "ready", data }))
         .catch((error: unknown) => setPanel(failed(error)));
     },
     [failed],
+  );
+
+  /** Open a parcel fresh: default inputs, as the bake ran it. */
+  const underwrite = useCallback(
+    (parcelId: string) => {
+      setDemolition(false);
+      setOverrides({});
+      setPanel({ kind: "loading" });
+      run(parcelId, { overrides: {}, demolition: false });
+    },
+    [run],
   );
 
   /** The deliberate step into the full model, from the popup. */
@@ -126,12 +157,24 @@ export function App() {
       if (!parcelId) return;
       setDemolition(next);
       setRerunning(true);
-      getUnderwrite(parcelId, { includeDemolition: next })
-        .then((data) => setPanel({ kind: "ready", data }))
-        .catch((error: unknown) => setPanel(failed(error)))
-        .finally(() => setRerunning(false));
+      run(parcelId, { overrides, demolition: next }).finally(() => setRerunning(false));
     },
-    [selection?.parcelId, selectedFromLink, failed],
+    [selection?.parcelId, selectedFromLink, overrides, run],
+  );
+
+  /** The 1c modal's "Re-underwrite parcel". */
+  const applyOverrides = useCallback(
+    (next: Overrides) => {
+      const parcelId = selection?.parcelId ?? selectedFromLink;
+      if (!parcelId) return;
+      setOverrides(next);
+      setRerunning(true);
+      run(parcelId, { overrides: next, demolition }).finally(() => {
+        setRerunning(false);
+        setModalOpen(false);
+      });
+    },
+    [selection?.parcelId, selectedFromLink, demolition, run],
   );
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
@@ -220,6 +263,7 @@ export function App() {
             demolition={demolition}
             busy={rerunning}
             onDemolitionChange={changeDemolition}
+            onEditAssumptions={defaults ? () => setModalOpen(true) : undefined}
             onClose={closePanel}
           />
         )}
@@ -237,6 +281,20 @@ export function App() {
           <div className={`${styles.panelState} ${styles.error}`}>{panel.message}</div>
         )}
       </main>
+
+      {modalOpen && defaults && meta && vocab && panel.kind === "ready" && (
+        <InputsModal
+          defaults={defaults}
+          labels={meta.labels}
+          vocab={vocab}
+          overrides={overrides}
+          displayName={panel.data.display_name}
+          confidence={panel.data.confidence}
+          busy={rerunning}
+          onApply={applyOverrides}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -14,7 +14,22 @@ export interface Labels {
   binding_constraint: Record<string, string>;
   status: Record<string, string>;
   tier: Record<string, string>;
+  /** The 1c inputs modal: group headings, per-input labels, and per-input unit kind. */
+  assumption_group: Record<string, string>;
+  assumption: Record<string, string>;
+  assumption_kind: Record<string, string>;
 }
+
+/** The editable groups of an assumption set, as /assumptions/default serves them. */
+export type AssumptionGroups = Record<string, Record<string, number | boolean | string>>;
+
+/** `/assumptions/default`. The two identifying fields sit alongside the groups on the
+ * wire, so the type is an intersection rather than an extension — a group index signature
+ * cannot also admit bare strings. */
+export type AssumptionSet = AssumptionGroups & {
+  assumption_set_id: string;
+  name: string;
+};
 
 export interface ObjectiveRamp {
   objective: string;

@@ -75,6 +75,7 @@ export function Drilldown({
   demolition,
   busy = false,
   onDemolitionChange,
+  onEditAssumptions,
   onClose,
 }: {
   data: Underwrite;
@@ -83,6 +84,7 @@ export function Drilldown({
   /** A re-underwrite is in flight; the panel still shows the previous, valid numbers. */
   busy?: boolean;
   onDemolitionChange: (next: boolean) => void;
+  onEditAssumptions?: () => void;
   onClose?: () => void;
 }) {
   const lot = data.lot_area_sf ? `${count(data.lot_area_sf)} SF lot` : null;
@@ -155,8 +157,14 @@ export function Drilldown({
       </div>
 
       <footer className={styles.footer}>
-        <button className={styles.footerPrimary} disabled>
-          Edit assumptions &amp; re-underwrite
+        <button
+          className={styles.footerPrimary}
+          onClick={onEditAssumptions}
+          disabled={!onEditAssumptions || busy}
+        >
+          {data.overrides_changed > 0
+            ? `Edit assumptions · ${data.overrides_changed} changed`
+            : "Edit assumptions & re-underwrite"}
         </button>
         <button className={styles.footerSecondary} disabled>
           Save scenario

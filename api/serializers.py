@@ -366,4 +366,10 @@ def labels_block() -> dict:
         "binding_constraint": dict(vocab.BINDING_CONSTRAINT_LABELS),
         "status": dict(vocab.STATUS_LABELS),
         "tier": dict(vocab.TIER_LABELS),
+        "assumption_group": dict(vocab.ASSUMPTION_GROUP_LABELS),
+        "assumption": {k: v[0] for k, v in vocab.ASSUMPTION_FIELDS.items()},
+        # Unit kind per input. Shipped alongside the label because it is a fact about the
+        # number's meaning, not a styling choice: `soft_cost_pct` is 0.2 on the wire and
+        # must be edited as 20%.
+        "assumption_kind": {k: v[1] for k, v in vocab.ASSUMPTION_FIELDS.items()},
     }
