@@ -18,7 +18,9 @@
 
 .row {
   display: grid;
-  grid-template-columns: 74px 1fr 52px;
+  /* 92px, not the handoff's 74px: "Construction loan" ellipsised to "Construction …" at
+     74, and a truncated line item in a capital stack is not a legible chart. */
+  grid-template-columns: 92px 1fr 52px;
   align-items: center;
   gap: 8px;
   margin: 4px 0;

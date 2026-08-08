@@ -41,6 +41,7 @@ export function App() {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [panel, setPanel] = useState<PanelState>({ kind: "closed" });
+  const [selectedFromLink, setSelectedFromLink] = useState<string | null>(null);
   const [demolition, setDemolition] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -84,16 +85,35 @@ export function App() {
     return { kind: "error", message: String(error) } as const;
   }, []);
 
-  /** The deliberate step into the full model. */
+  /** Run the full model on one parcel and show it in the panel. */
+  const underwrite = useCallback(
+    (parcelId: string) => {
+      setDemolition(false); // a fresh parcel starts from the default, as the bake ran it
+      setPanel({ kind: "loading" });
+      getUnderwrite(parcelId)
+        .then((data) => setPanel({ kind: "ready", data }))
+        .catch((error: unknown) => setPanel(failed(error)));
+    },
+    [failed],
+  );
+
+  /** The deliberate step into the full model, from the popup. */
   const openFull = useCallback(() => {
-    const parcelId = selection?.parcelId;
-    if (!parcelId) return;
-    setDemolition(false); // a fresh parcel starts from the default, as the bake ran it
-    setPanel({ kind: "loading" });
-    getUnderwrite(parcelId)
-      .then((data) => setPanel({ kind: "ready", data }))
-      .catch((error: unknown) => setPanel(failed(error)));
-  }, [selection?.parcelId, failed]);
+    if (selection?.parcelId) underwrite(selection.parcelId);
+  }, [selection?.parcelId, underwrite]);
+
+  /** `?parcel=<id>` opens the drill-down directly.
+   *
+   * A default-assumption underwrite is a pure function of the parcel and the batch, which
+   * is why the endpoint is a cacheable GET — so a panel is genuinely linkable, and sharing
+   * "look at this one" does not mean "open the map and hunt for it". */
+  useEffect(() => {
+    const parcelId = new URLSearchParams(window.location.search).get("parcel");
+    if (parcelId) {
+      setSelectedFromLink(parcelId);
+      underwrite(parcelId);
+    }
+  }, [underwrite]);
 
   /** Demolition re-runs the whole model, so every figure in the panel moves with it.
    *
@@ -102,7 +122,7 @@ export function App() {
    * blanking a dense panel for a second of work reads as a fault. */
   const changeDemolition = useCallback(
     (next: boolean) => {
-      const parcelId = selection?.parcelId;
+      const parcelId = selection?.parcelId ?? selectedFromLink;
       if (!parcelId) return;
       setDemolition(next);
       setRerunning(true);
@@ -111,7 +131,7 @@ export function App() {
         .catch((error: unknown) => setPanel(failed(error)))
         .finally(() => setRerunning(false));
     },
-    [selection?.parcelId, failed],
+    [selection?.parcelId, selectedFromLink, failed],
   );
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
@@ -149,7 +169,7 @@ export function App() {
             <MapView
               tilesetUrl={meta.tileset_url}
               objective={objective}
-              selectedId={selection?.parcelId ?? null}
+              selectedId={selection?.parcelId ?? selectedFromLink}
               filter={filter}
               onSelect={select}
               onSelectNothing={dismiss}

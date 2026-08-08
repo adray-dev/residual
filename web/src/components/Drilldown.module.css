@@ -92,9 +92,21 @@
   padding: 18px 22px 24px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+/* Nothing in a scrolling column may shrink — it should overflow and scroll instead.
+ *
+ * Without this the metric grid and the program card collapsed to ZERO height while the
+ * hero and callouts beside them were fine. Both collapsing elements set `overflow: hidden`
+ * (they clip their children to a rounded border), and a flex item whose overflow is not
+ * `visible` has an automatic minimum size of 0 rather than its content height — so they
+ * were the only children the overflowing container was allowed to crush. */
+.body > * {
+  flex-shrink: 0;
 }
 
 /* --- hero ----------------------------------------------------------------- */

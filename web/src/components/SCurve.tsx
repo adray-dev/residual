@@ -27,15 +27,19 @@ const EQUITY = "#c08a3e";
 const W = 240;
 const H = 96;
 
+// Headroom, in viewBox units. The peak of the cost curve IS the maximum, so without this
+// it lands on y=0 and the top half of a 2.2px stroke is clipped by the plot edge.
+const PAD_TOP = 5;
+
+function y(value: number, max: number): number {
+  return H - (value / max) * (H - PAD_TOP);
+}
+
 function path(series: number[], max: number): string {
   if (series.length < 2 || max <= 0) return "";
   const step = W / (series.length - 1);
   return series
-    .map((value, index) => {
-      const x = index * step;
-      const y = H - (value / max) * H;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
+    .map((value, index) => `${index === 0 ? "M" : "L"}${(index * step).toFixed(2)},${y(value, max).toFixed(2)}`)
     .join(" ");
 }
 
@@ -102,7 +106,7 @@ export function SCurve({ cashflow }: { cashflow: CashFlowOut }) {
           <g>
             <circle
               cx={(hover.index / months) * W}
-              cy={H - ((cost[hover.index] ?? 0) / max) * H}
+              cy={y(cost[hover.index] ?? 0, max)}
               r={3}
               fill={COST}
               stroke="#fff"
@@ -111,7 +115,7 @@ export function SCurve({ cashflow }: { cashflow: CashFlowOut }) {
             />
             <circle
               cx={(hover.index / months) * W}
-              cy={H - ((equity[hover.index] ?? 0) / max) * H}
+              cy={y(equity[hover.index] ?? 0, max)}
               r={3}
               fill={EQUITY}
               stroke="#fff"
