@@ -47,6 +47,7 @@ import { Popup } from "./components/Popup";
 import { Compare, CompareTray } from "./components/Compare";
 import { Shortlist } from "./components/Shortlist";
 import { Table } from "./components/Table";
+import { Search } from "./components/Search";
 import { MAX_COMPARE, toggleCompare } from "./lib/compare";
 import styles from "./App.module.css";
 
@@ -96,6 +97,8 @@ export function App() {
   const [listBusy, setListBusy] = useState(false);
   const [memberOf, setMemberOf] = useState<string[]>([]);
   const [tableOpen, setTableOpen] = useState(false);
+  /** Where the map should fly to, set by a search pick. */
+  const [flyTo, setFlyTo] = useState<{ lon: number; lat: number; parcelId: string } | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -367,6 +370,20 @@ export function App() {
       <header className={styles.topbar}>
         <Logo />
         <span className={styles.wordmark}>Residual</span>
+        {vocab && (
+          <Search
+            vocab={vocab}
+            onPick={(hit) => {
+              // Move the map and select, rather than opening the panel: on a map screen,
+              // search means "take me there". The full model stays one click away.
+              setSelectedFromLink(hit.parcel_id);
+              setPanel({ kind: "closed" });
+              if (hit.lon != null && hit.lat != null) {
+                setFlyTo({ lon: hit.lon, lat: hit.lat, parcelId: hit.parcel_id });
+              }
+            }}
+          />
+        )}
         <button className={styles.topAction} onClick={() => setTableOpen(true)}>
           Table view
         </button>
@@ -401,6 +418,7 @@ export function App() {
               objective={objective}
               selectedId={selection?.parcelId ?? selectedFromLink}
               filter={filter}
+              flyTo={flyTo}
               onSelect={select}
               onSelectNothing={dismiss}
             />

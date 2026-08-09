@@ -1,0 +1,132 @@
+.wrap {
+  position: relative;
+  flex: 1;
+  max-width: 460px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  background: var(--canvas);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  padding: 0 12px;
+}
+
+.field:focus-within {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--ink-25);
+}
+
+/* The handoff's right-aligned hint, naming what the field actually accepts. */
+.hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-25);
+  white-space: nowrap;
+}
+
+.clear {
+  border: 0;
+  background: transparent;
+  color: var(--ink-40);
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 50%;
+}
+
+.clear:hover {
+  color: var(--ink);
+}
+
+/* --- results -------------------------------------------------------------- */
+.results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: var(--r-panel);
+  box-shadow: var(--sh-floating);
+  padding: 5px;
+  max-height: 340px;
+  overflow-y: auto;
+  z-index: 5;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--r-input);
+}
+
+.result:hover,
+.result.active {
+  background: var(--accent-tint);
+}
+
+.resultText {
+  flex: 1;
+  min-width: 0;
+}
+
+.resultName {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-40);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The status dot repeats the map's own palette, so a result reads the same way the
+   parcel does once you land on it. */
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.state {
+  padding: 12px 12px;
+  font-size: 12px;
+  color: var(--ink-25);
+}

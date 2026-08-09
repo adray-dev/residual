@@ -35,6 +35,10 @@ def search(q: str = "", limit: int = 10, conn=Depends(get_conn)) -> dict:
                 "ward": ser.ward_name(h["submarket_id"]),
                 "display_name": ser.display_name(h["address"], h["ssl"]),
                 "status": h["status"],
+                # Centroid, so picking a result can move the map to the parcel. Without it
+                # search could only open a panel, which is not what a map search means.
+                "lon": h["lon"],
+                "lat": h["lat"],
             }
             for h in hits
         ],

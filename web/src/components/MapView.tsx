@@ -40,6 +40,8 @@ export interface MapViewProps {
   selectedId: string | null;
   /** Parcels NOT matching this are dimmed, not hidden. Null means no filter. */
   filter: FilterSpecification | null;
+  /** A search pick: fly here and select. */
+  flyTo: { lon: number; lat: number; parcelId: string } | null;
   /** Fires with the parcel id and its screen position, so a popup can anchor to it. */
   onSelect: (parcelId: string, at: { x: number; y: number }) => void;
   /** Clicking bare canvas dismisses the popup. */
@@ -51,6 +53,7 @@ export function MapView({
   objective,
   selectedId,
   filter,
+  flyTo,
   onSelect,
   onSelectNothing,
 }: MapViewProps) {
@@ -324,6 +327,16 @@ export function MapView({
     if (instance.isStyleLoaded()) apply();
     else instance.once("load", apply);
   }, [filter]);
+
+  // A search pick flies the camera to the parcel. z17 is close enough that a single lot
+  // fills a useful part of the view without losing the block around it.
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !flyTo) return;
+    const go = () => instance.flyTo({ center: [flyTo.lon, flyTo.lat], zoom: 17, duration: 900 });
+    if (instance.isStyleLoaded()) go();
+    else instance.once("load", go);
+  }, [flyTo]);
 
   // Selection is owned by the app (the panel and the map must agree), so the map follows
   // the prop rather than holding its own copy.

@@ -117,6 +117,18 @@ export interface MapQuery {
   irr_filter_applied: boolean;
 }
 
+/** One `/parcels/search` hit. Carries a centroid so the map can move to it. */
+export interface SearchResult {
+  parcel_id: string;
+  address: string | null;
+  neighborhood: string | null;
+  ward: string | null;
+  display_name: string;
+  status: string;
+  lon: number | null;
+  lat: number | null;
+}
+
 export interface ShortlistSummary {
   shortlist_id: string;
   name: string;

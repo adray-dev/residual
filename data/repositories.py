@@ -916,17 +916,24 @@ def search_parcels(conn, q: str, limit: int = 10) -> list[dict]:
         return []
     like = f"%{term}%"
     prefix = f"{term}%"
+    # Wards are stored as `ward_6` but nobody types that. Normalising the query lets
+    # "Ward 6", "ward 6" and "6" all reach the column the docstring has always claimed was
+    # searchable — it was not, because the WHERE clause never mentioned it.
+    ward_like = f"%{term.lower().replace(' ', '_')}%"
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT p.ssl, p.address, p.neighborhood, p.submarket_id, b.status
+            """SELECT p.ssl, p.address, p.neighborhood, p.submarket_id, b.status,
+                      ST_X(ST_Centroid(p.parcel_geom)) AS lon,
+                      ST_Y(ST_Centroid(p.parcel_geom)) AS lat
                FROM parcels p
                LEFT JOIN bake_results b
                  ON b.ssl = p.ssl AND b.is_best
                 AND b.computed_at = (SELECT max(computed_at) FROM bake_results)
                WHERE p.address ILIKE %s OR p.ssl ILIKE %s OR p.neighborhood ILIKE %s
+                  OR p.submarket_id ILIKE %s
                ORDER BY (p.address ILIKE %s) DESC, (p.ssl ILIKE %s) DESC, p.address, p.ssl
                LIMIT %s""",
-            (like, like, like, prefix, prefix, limit),
+            (like, like, like, ward_like, prefix, prefix, limit),
         )
         return cur.fetchall()
 

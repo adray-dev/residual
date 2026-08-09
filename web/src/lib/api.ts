@@ -4,6 +4,7 @@ import type {
   MapQuery,
   Meta,
   ParcelRecord,
+  SearchResult,
   ShortlistDetail,
   ShortlistSummary,
   Underwrite,
@@ -97,6 +98,15 @@ export function getMapQuery(
  * full model is a separate, deliberate step the user takes from the popup. */
 export function getParcel(parcelId: string, signal?: AbortSignal): Promise<ParcelRecord> {
   return request<ParcelRecord>(parcelPath(parcelId), { signal });
+}
+
+/** Typeahead over address, parcel ID, ward and neighbourhood. */
+export async function searchParcels(q: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  const response = await request<{ results: SearchResult[] }>(
+    `/parcels/search?q=${encodeURIComponent(q)}&limit=8`,
+    { signal },
+  );
+  return response.results;
 }
 
 // --- shortlists ------------------------------------------------------------

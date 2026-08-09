@@ -371,3 +371,48 @@ def test_sorting_is_server_side_across_the_whole_match_set(client):
         ).json()
         ascending = [r[key] for r in asc["rows"] if r[key] is not None]
         assert ascending == sorted(ascending), key
+
+
+# ---------------------------------------------------------------------------
+# /parcels/search — the 1a search field
+# ---------------------------------------------------------------------------
+def test_search_finds_a_parcel_by_address_and_by_id(client):
+    row = client.get("/map/query", params={"statuses": ["scored"], "limit": 1}).json()["rows"][0]
+
+    by_id = client.get("/parcels/search", params={"q": row["parcel_id"]}).json()["results"]
+    assert any(hit["parcel_id"] == row["parcel_id"] for hit in by_id)
+
+    if row["address"]:
+        by_address = client.get("/parcels/search", params={"q": row["address"]}).json()["results"]
+        assert any(hit["parcel_id"] == row["parcel_id"] for hit in by_address)
+
+
+def test_search_matches_a_ward_the_way_a_person_types_it(client):
+    """Wards are stored as `ward_6`; nobody types that. The docstring claimed ward was
+    searchable long before the WHERE clause actually mentioned the column."""
+    for term in ("Ward 6", "ward 6", "ward_6"):
+        results = client.get("/parcels/search", params={"q": term}).json()["results"]
+        assert results, term
+        assert all(hit["ward"] == "Ward 6" for hit in results), term
+
+
+def test_every_search_hit_carries_a_point_to_move_the_map_to(client):
+    """Search on a map screen means "take me there", which needs a coordinate."""
+    results = client.get("/parcels/search", params={"q": "Ward 6"}).json()["results"]
+    for hit in results:
+        assert hit["lon"] is not None and hit["lat"] is not None, hit["parcel_id"]
+        # Inside DC's bounding box, so a bad centroid cannot silently fly the map to null island.
+        assert -77.2 < hit["lon"] < -76.8, hit
+        assert 38.7 < hit["lat"] < 39.1, hit
+
+
+def test_search_never_says_ssl(client):
+    """The identifier is "Parcel ID" everywhere a person can read it, fallbacks included."""
+    results = client.get("/parcels/search", params={"q": "Ward 6"}).json()["results"]
+    for hit in results:
+        assert "SSL" not in (hit["display_name"] or "").upper().split()
+
+
+def test_an_empty_search_returns_nothing_rather_than_everything(client):
+    assert client.get("/parcels/search", params={"q": ""}).json()["results"] == []
+    assert client.get("/parcels/search", params={"q": "   "}).json()["results"] == []
