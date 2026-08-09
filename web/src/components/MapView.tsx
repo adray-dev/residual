@@ -63,12 +63,20 @@ export function MapView({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const hovered = useRef<string | null>(null);
-  // Held in a ref so the click handler, which is bound once, always calls the current
-  // callback instead of the one captured at mount.
+  // Held in refs so the click handler, bound once at mount, always calls the CURRENT
+  // callback rather than the one captured then. Assigned in an effect, not during render —
+  // mutating a ref while rendering is a React rule violation, and effects still run before
+  // any click can arrive.
   const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
   const onSelectNothingRef = useRef(onSelectNothing);
-  onSelectNothingRef.current = onSelectNothing;
+  // The objective is read once when the layers are created; the effect below repaints on
+  // every later change, so this only has to be right at mount.
+  const objectiveRef = useRef(objective);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+    onSelectNothingRef.current = onSelectNothing;
+    objectiveRef.current = objective;
+  });
 
   useEffect(() => {
     if (!container.current) return;
@@ -173,7 +181,10 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: SCORED,
-        paint: { "fill-color": valueRamp(objective), "fill-opacity": FILL_OPACITY },
+        paint: {
+          "fill-color": valueRamp(objectiveRef.current),
+          "fill-opacity": FILL_OPACITY,
+        },
       });
 
       // The white hairline between lots. Fades out when zoomed far enough that every lot

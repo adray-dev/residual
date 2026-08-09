@@ -47,6 +47,12 @@ explicit: **do not present the resulting prototype ordering as a finding until s
 
 ## Fixed
 
+- **No `react-hooks` lint.** Closed 2026-08-09. Added ESLint with `exhaustive-deps`,
+  `rules-of-hooks` and `refs` as errors — the class that had already made the demolition
+  toggle a silent no-op. The first run found four real defects: two missing dependencies
+  (`objective` in the map's mount effect, `at` in the popup's placement effect) and two
+  refs mutated during render. Run with `npm run lint`.
+
 - **Sources and uses stopped balancing once an assumption was overridden.** Closed
   2026-08-08. Development equity was summed from negative equity cash flows across the
   WHOLE hold, so a cash-in refinancing at stabilization (perm loan below the construction
@@ -63,12 +69,11 @@ explicit: **do not present the resulting prototype ordering as a finding until s
 
 ## v2
 
-- **Map first interaction is slow.** The tileset is 30.4 MB across 132,604 parcels and
+- **Map first interaction is slow.** The tileset is 33.5 MB across 132,604 parcels and
   MapLibre parses a lot of geometry before the first paint settles. Revisit in v2:
-  candidates are dropping `--no-tile-size-limit` in favour of a real budget above z13,
+  candidates are dropping `--no-tile-size-limit` in favor of a real budget above z13,
   trimming attributes that only the drill-down needs, and splitting the value bins into
   their own thin overlay so a zoomed-out view does not carry parcel-level geometry.
-  Deliberately not optimised now — correctness of what the map *says* came first.
-- **No `react-hooks/exhaustive-deps` lint.** A stale-closure bug (a dependency array
-  missing `selectedFromLink`) silently made the demolition toggle a no-op with no error and
-  no request. ESLint with that rule catches the whole class.
+  Deliberately not optimized now — correctness of what the map *says* came first.
+  Partly addressed 2026-08-09: fills fade and the ramp collapses to three bands below z12,
+  which softens the city view but does not reduce what is parsed.

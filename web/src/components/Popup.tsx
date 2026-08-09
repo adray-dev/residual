@@ -78,6 +78,7 @@ export function Popup({
   //
   // So: measure the card and its container, clamp both axes inside the container, and flip
   // BELOW the parcel when there is no room above.
+  const { x: atX, y: atY } = at;
   useLayoutEffect(() => {
     const element = card.current;
     if (!element) return;
@@ -86,7 +87,7 @@ export function Popup({
       const parent = element.offsetParent as HTMLElement | null;
       setBox(
         placePopup(
-          at,
+          { x: atX, y: atY },
           { width: element.offsetWidth, height: element.offsetHeight },
           {
             width: parent?.clientWidth ?? window.innerWidth,
@@ -105,7 +106,7 @@ export function Popup({
     const parent = element.offsetParent;
     if (parent instanceof HTMLElement) observer.observe(parent);
     return () => observer.disconnect();
-  }, [at.x, at.y]);
+  }, [atX, atY]);
 
   const best = record?.prototypes.find((p) => p.is_best) ?? record?.prototypes[0] ?? null;
   const scored = record?.status === "scored" && best != null;
