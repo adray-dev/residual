@@ -59,7 +59,7 @@ def test_meta_serves_the_vocabulary_so_the_client_keeps_no_copy(meta):
     labels = meta["labels"]
     assert set(labels) == {
         "metric", "prototype", "construction", "parking",
-        "binding_constraint", "status", "tier",
+        "binding_constraint", "binding_constraint_short", "status", "tier",
         "assumption_group", "assumption", "assumption_kind",
     }
     # The handoff's language rules, spot-checked.
@@ -110,6 +110,16 @@ def test_no_labeled_assumption_is_one_the_engine_would_ignore(meta, client):
         for key in defaults[group]
     }
     assert set(meta["labels"]["assumption"]) <= known
+
+
+def test_unencoded_zoning_is_never_called_exempt(meta):
+    """`zone_not_encoded` means WE have not encoded the district — D-6, CG-4, ARTS-2 and
+    other downtown districts among the most developable land in the city. Labelling it
+    "exempt" would tell a user those parcels cannot be developed, which is false: the gap
+    is in our coverage, not in their development rights."""
+    label = meta["labels"]["status"]["zone_not_encoded"]
+    assert "exempt" not in label.lower(), label
+    assert meta["labels"]["status"]["exempt"] == "Public parcel — exempt"
 
 
 def test_meta_never_says_ssl_anywhere_in_user_facing_text(meta):
@@ -278,7 +288,10 @@ def test_unencoded_zoning_is_an_answer_not_an_error(client):
     ).json()["rows"]
     body = client.get(f"/parcel/{rows[0]['parcel_id']}").json()
     assert body["zoning"]["encoded"] is False
-    assert body["status_label"] == "Zoning not yet covered"
+    # Says the district is not covered and the parcel is not assessed. It deliberately does
+    # NOT say "exempt": these are ordinary districts (D-6, CG-4, ARTS-2) whose rules we have
+    # not encoded, not land that cannot be developed.
+    assert body["status_label"] == "Zoning not yet covered — not assessed"
 
 
 def test_missing_parcel_is_404(client):

@@ -20,6 +20,15 @@ export interface FilterState {
   /** Screening RLV floor/ceiling in dollars. Null means unbounded. */
   rlvMin: number | null;
   rlvMax: number | null;
+  /** Program filters. Each has a tile attribute, so the map narrows with the count. */
+  unitsMin: number | null;
+  unitsMax: number | null;
+  floorsMin: number | null;
+  floorsMax: number | null;
+  buildingSfMin: number | null;
+  buildingSfMax: number | null;
+  /** Nothing standing. Mutually informative with the building-area range, not exclusive. */
+  vacantOnly: boolean;
 }
 
 // IRR is deliberately NOT a filter. It is absent from the tile — levered IRR is not in the
@@ -32,6 +41,13 @@ export const EMPTY_FILTERS: FilterState = {
   prototypes: [],
   rlvMin: null,
   rlvMax: null,
+  unitsMin: null,
+  unitsMax: null,
+  floorsMin: null,
+  floorsMax: null,
+  buildingSfMin: null,
+  buildingSfMax: null,
+  vacantOnly: false,
 };
 
 export function isEmpty(state: FilterState): boolean {
@@ -39,7 +55,14 @@ export function isEmpty(state: FilterState): boolean {
     state.wards.length === 0 &&
     state.prototypes.length === 0 &&
     state.rlvMin == null &&
-    state.rlvMax == null
+    state.rlvMax == null &&
+    state.unitsMin == null &&
+    state.unitsMax == null &&
+    state.floorsMin == null &&
+    state.floorsMax == null &&
+    state.buildingSfMin == null &&
+    state.buildingSfMax == null &&
+    !state.vacantOnly
   );
 }
 
@@ -75,6 +98,29 @@ export function mapFilter(state: FilterState): FilterSpecification | null {
     }
   }
 
+  // Program bounds. `coalesce` supplies a sentinel that fails the comparison, so a parcel
+  // missing the attribute is excluded rather than swept in by a null.
+  const range = (
+    attribute: string,
+    min: number | null,
+    max: number | null,
+    missing: number,
+  ) => {
+    if (min != null) {
+      clauses.push([">=", ["coalesce", ["get", attribute], missing], min]);
+    }
+    if (max != null) {
+      clauses.push(["<=", ["coalesce", ["get", attribute], missing], max]);
+    }
+  };
+  range("units", state.unitsMin, state.unitsMax, -1);
+  range("floors", state.floorsMin, state.floorsMax, -1);
+  // Building area defaults to 0, which is the truthful value: no building recorded.
+  range("bldg", state.buildingSfMin, state.buildingSfMax, 0);
+  if (state.vacantOnly) {
+    clauses.push(["==", ["coalesce", ["get", "bldg"], 0], 0]);
+  }
+
   if (!clauses.length) return null;
   return ["all", ...clauses] as FilterSpecification;
 }
@@ -91,6 +137,13 @@ export function queryParams(state: FilterState): Record<string, string | number 
   if (state.prototypes.length) params.prototypes = state.prototypes;
   if (state.rlvMin != null) params.rlv_min = state.rlvMin;
   if (state.rlvMax != null) params.rlv_max = state.rlvMax;
+  if (state.unitsMin != null) params.units_min = state.unitsMin;
+  if (state.unitsMax != null) params.units_max = state.unitsMax;
+  if (state.floorsMin != null) params.floors_min = state.floorsMin;
+  if (state.floorsMax != null) params.floors_max = state.floorsMax;
+  if (state.buildingSfMin != null) params.building_sf_min = state.buildingSfMin;
+  if (state.buildingSfMax != null) params.building_sf_max = state.buildingSfMax;
+  if (state.vacantOnly) params.vacant_only = "true";
   return params;
 }
 

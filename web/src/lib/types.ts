@@ -12,6 +12,7 @@ export interface Labels {
   construction: Record<string, string>;
   parking: Record<string, string>;
   binding_constraint: Record<string, string>;
+  binding_constraint_short: Record<string, string>;
   status: Record<string, string>;
   tier: Record<string, string>;
   /** The 1c inputs modal: group headings, per-input labels, and per-input unit kind. */

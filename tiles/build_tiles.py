@@ -142,6 +142,13 @@ def build_features(conn, batch: datetime, report: TileReport):
             # the UI shows that list's `name`.
             "ward": row["submarket_id"],
             "proto": row["prototype_id"] if row["prototype_id"] != repo.NONE_PROTOTYPE else None,
+            # Unit count, story count and standing building area travel in the tile for the
+            # same reason `ward` does: the left pane filters on them, and a filter that
+            # narrows a server count without repainting the map is worse than no filter —
+            # that is exactly the trap the IRR filter fell into.
+            "units": row["unit_count"],
+            "floors": row["floors"],
+            "bldg": row["existing_building_sf"] or 0,
             "rlv": row["rlv_total"],
             "rlv_sf": row["rlv_per_buildable_sf"],
             "gap": row["feasibility_gap"],

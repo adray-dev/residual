@@ -554,6 +554,22 @@ def _map_where(
     if filters.get("min_confidence") is not None:
         where.append("b.confidence >= %s")
         params.append(filters["min_confidence"])
+    # Program filters. Each has a matching tile attribute so the map narrows with the count.
+    for key, sql in (
+        ("units_min", "b.unit_count >= %s"),
+        ("units_max", "b.unit_count <= %s"),
+        ("floors_min", "b.floors >= %s"),
+        ("floors_max", "b.floors <= %s"),
+        ("building_sf_min", "COALESCE(p.existing_building_sf, 0) >= %s"),
+        ("building_sf_max", "COALESCE(p.existing_building_sf, 0) <= %s"),
+    ):
+        if filters.get(key) is not None:
+            where.append(sql)
+            params.append(filters[key])
+    # Vacant land: nothing standing. COALESCE because the column is nullable and a null
+    # means "no building recorded", which is what vacant means.
+    if filters.get("vacant_only"):
+        where.append("COALESCE(p.existing_building_sf, 0) = 0")
     return where, params
 
 
@@ -661,7 +677,8 @@ def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> It
         cur.itersize = batch_size
         cur.execute(
             """SELECT b.ssl, b.prototype_id, b.status, b.rlv_total, b.rlv_per_buildable_sf,
-                      b.feasibility_gap, b.confidence, p.submarket_id,
+                      b.feasibility_gap, b.confidence, b.unit_count, b.floors,
+                      p.existing_building_sf, p.submarket_id,
                       NOT ST_IsValid(p.parcel_geom) AS was_invalid,
                       ST_Area(p.parcel_geom::geography) AS area_m2,
                       ST_AsGeoJSON(
@@ -996,6 +1013,22 @@ def latest_bake_for_map(
     if filters.get("min_confidence") is not None:
         where.append("b.confidence >= %s")
         params.append(filters["min_confidence"])
+    # Program filters. Each has a matching tile attribute so the map narrows with the count.
+    for key, sql in (
+        ("units_min", "b.unit_count >= %s"),
+        ("units_max", "b.unit_count <= %s"),
+        ("floors_min", "b.floors >= %s"),
+        ("floors_max", "b.floors <= %s"),
+        ("building_sf_min", "COALESCE(p.existing_building_sf, 0) >= %s"),
+        ("building_sf_max", "COALESCE(p.existing_building_sf, 0) <= %s"),
+    ):
+        if filters.get(key) is not None:
+            where.append(sql)
+            params.append(filters[key])
+    # Vacant land: nothing standing. COALESCE because the column is nullable and a null
+    # means "no building recorded", which is what vacant means.
+    if filters.get("vacant_only"):
+        where.append("COALESCE(p.existing_building_sf, 0) = 0")
 
     order = MAP_OBJECTIVES.get(objective, MAP_OBJECTIVES[DEFAULT_MAP_OBJECTIVE])
 

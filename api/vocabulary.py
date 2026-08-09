@@ -92,6 +92,17 @@ BINDING_CONSTRAINT_LABELS: dict[str, str] = {
 }
 
 
+# The bare noun, for places that supply their own "Limited by" heading. The popup labels
+# the ROW "Limited by" and then repeated it in the value — "Limited by / Limited by floor
+# area" — so the short form exists to be the answer rather than the sentence.
+BINDING_CONSTRAINT_SHORT: dict[str, str] = {
+    "far": "Floor area",
+    "height": "Height",
+    "stories": "Story count",
+    "lot_coverage": "Lot coverage",
+}
+
+
 def binding_constraint_label(value: str | None) -> str | None:
     """"Limited by height". For status rows the value is a sentence already — pass it through."""
     if not value:
@@ -105,9 +116,14 @@ def binding_constraint_label(value: str | None) -> str | None:
 STATUS_LABELS: dict[str, str] = {
     "scored": "Scored",
     "infeasible": "Infeasible under zoning",
-    "exempt": "Not developable — public / exempt",
+    # All 9,418 of these carry `is_exempt`: federal, church, cemetery, public, ROW.
+    "exempt": "Public parcel — exempt",
     "historic": "Historic — restricted",
-    "zone_not_encoded": "Zoning not yet covered",
+    # NOT "exempt". These are ordinary districts whose rules are not yet hand-encoded —
+    # D-6, CG-4, ARTS-2, NMU-7B/GA, some of the most developable land downtown. Calling
+    # them exempt would state something false about the parcel; what is missing is our
+    # coverage, not their development rights.
+    "zone_not_encoded": "Zoning not yet covered — not assessed",
 }
 
 # --- assumption inputs (the 1c modal) ---------------------------------------

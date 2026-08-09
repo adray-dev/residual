@@ -214,12 +214,17 @@ export function MapView({
         },
       });
 
-      // The selection ring: 3px white glow under a 2.5px ink stroke, per the handoff.
+      // The selection ring. A white glow under an ink stroke, both heavier than the
+      // handoff's 3px/2.5px: at city zoom a single lot is a few pixels across, and a
+      // hairline ring around it was indistinguishable from the parcel borders around it.
+      // The ring also does NOT fade with zoom, unlike those borders — the whole point is
+      // that you can still find the parcel you are assessing after panning away.
+      //
       // Drawn via feature state rather than a filter so selecting does not invalidate the
       // layer and re-parse tiles.
       for (const [id, color, width] of [
-        ["parcels-selected-glow", "#ffffff", 5.5],
-        ["parcels-selected", "#1a1d1c", 2.5],
+        ["parcels-selected-glow", "#ffffff", 8],
+        ["parcels-selected", "#1a1d1c", 3.5],
       ] as const) {
         instance.addLayer({
           id,

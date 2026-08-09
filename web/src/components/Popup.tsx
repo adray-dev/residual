@@ -110,6 +110,10 @@ export function Popup({
   const best = record?.prototypes.find((p) => p.is_best) ?? record?.prototypes[0] ?? null;
   const scored = record?.status === "scored" && best != null;
 
+  // Undevelopable land gets a plain status card and NOTHING else — no save, no compare, no
+  // underwriting. All three are operations on a priced parcel; offering them here, even
+  // greyed out, implies the model has something to say about a cemetery. It does not.
+
   return (
     <div
       className={styles.popup}
@@ -128,7 +132,6 @@ export function Popup({
           {record && (
             <div className={styles.identity}>
               {PARCEL_ID_LABEL} {record.parcel_id.trim()}
-              {record.ward ? ` · ${record.ward}` : ""}
             </div>
           )}
         </div>
@@ -151,10 +154,7 @@ export function Popup({
             </span>
           </div>
           <div className={styles.rows}>
-            <Row
-              label="Zoning · best build"
-              value={`${record.zoning.zone_code ?? "—"} · ${vocab.prototype(best.prototype_id)}`}
-            />
+            <Row label="Best build" value={vocab.prototype(best.prototype_id)} />
             <Row label={vocab.metric("max_buildable_gsf")} value={`${count(best.gross_sf)} SF`} />
             <Row label={vocab.metric("lot_area_sf")} value={`${count(record.lot_area_sf)} SF`} />
             <Row
@@ -167,20 +167,16 @@ export function Popup({
             />
             <Row
               label="Limited by"
-              value={
-                vocab.bindingConstraint(
-                  best.binding_constraint_label ?? best.binding_constraint,
-                ) || "—"
-              }
+              value={vocab.bindingConstraintShort(best.binding_constraint) || "—"}
             />
           </div>
         </>
       ) : (
-        // Not scored: the status sentence goes where the number would, in the quiet
-        // neutral register the handoff uses. No dash, no zero, no implied verdict.
+        // Undevelopable land: the status sentence and nothing else.
         <div className={styles.statusLine}>{record.status_label}</div>
       )}
 
+      {scored && (
       <div className={styles.actions}>
         <button
           className={styles.primary}
@@ -217,11 +213,12 @@ export function Popup({
           {inCompare ? "In compare ✓" : "Compare"}
         </button>
       </div>
+      )}
 
       {/* The list picker lives in the popup rather than a separate dialog: saving is a
           one-click decision made while triaging, and bouncing to another screen to do it
           would break the loop the map is for. */}
-      {saving && (
+      {saving && scored && (
         <div className={styles.picker}>
           {lists.length === 0 ? (
             <div className={styles.pickerEmpty}>

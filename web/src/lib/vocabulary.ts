@@ -42,6 +42,13 @@ export class Vocabulary {
     return this.lookup("binding_constraint", key);
   }
 
+  /** "Floor area" — the bare noun, for a row already headed "Limited by". Without it the
+   * popup read "Limited by / Limited by floor area". */
+  bindingConstraintShort(key: string | null | undefined): string {
+    if (!key) return "";
+    return this.labels.binding_constraint_short?.[key] ?? this.bindingConstraint(key);
+  }
+
   /** "Infeasible under zoning" for `infeasible`. */
   status(key: string | null | undefined): string {
     return this.lookup("status", key);

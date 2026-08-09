@@ -85,6 +85,7 @@ class Labels(BaseModel):
     construction: dict[str, str]
     parking: dict[str, str]
     binding_constraint: dict[str, str]
+    binding_constraint_short: dict[str, str]
     status: dict[str, str]
     tier: dict[str, str]
     # The 1c inputs modal. `assumption_kind` carries the unit each input is expressed in
@@ -124,6 +125,15 @@ class MapFilters(BaseModel):
     rlv_min: float | None = None
     rlv_max: float | None = None
     min_confidence: float | None = None
+    # Program filters (the left pane). Every one has a tile attribute behind it, so the
+    # map narrows with the count rather than the two disagreeing.
+    units_min: int | None = None
+    units_max: int | None = None
+    floors_min: int | None = None
+    floors_max: int | None = None
+    building_sf_min: float | None = None
+    building_sf_max: float | None = None
+    vacant_only: bool = False
     # Levered IRR exists only in the full tier, so this filter runs the engine per parcel
     # and is bounded by `Limits.max_irr_filter_parcels` (see the router).
     irr_min: float | None = None

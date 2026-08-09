@@ -95,6 +95,9 @@ def _row(ssl, status="scored", **overrides):
         "feasibility_gap": 150_000.0,
         "confidence": 0.7,
         "submarket_id": "ward_6",
+        "unit_count": 24,
+        "floors": 3,
+        "existing_building_sf": 6400.0,
         "was_invalid": False,
         "area_m2": 500.0,
         "geometry": '{"type":"Polygon","coordinates":[[[0,0],[0,1],[1,1],[0,0]]]}',
@@ -128,7 +131,7 @@ def test_the_tile_carries_exactly_the_documented_attributes(fake_scan):
     features, _ = fake_scan([_row("0123    0456")])
     assert features[0]["properties"].keys() == {
         "id", "status", "ward", "proto", "rlv", "rlv_sf", "gap", "conf",
-        "bin", "bin_sf", "bin_gap",
+        "units", "floors", "bldg", "bin", "bin_sf", "bin_gap",
     }
 
 
@@ -137,6 +140,21 @@ def test_the_ward_travels_so_geography_filters_need_no_round_trip(fake_scan):
     which is what /meta's submarket list keys on — the UI renders that list's name."""
     features, _ = fake_scan([_row("A", submarket_id="ward_6")])
     assert features[0]["properties"]["ward"] == "ward_6"
+
+
+def test_program_attributes_travel_for_the_left_pane_filters(fake_scan):
+    """Units, stories and standing building area are filtered on client-side, so they have
+    to be in the tile — otherwise the filter narrows a count and leaves the map unchanged."""
+    features, _ = fake_scan([_row("A", unit_count=24, floors=3, existing_building_sf=6400.0)])
+    props = features[0]["properties"]
+    assert (props["units"], props["floors"], props["bldg"]) == (24, 3, 6400.0)
+
+
+def test_a_vacant_parcel_reports_zero_building_area_not_null(fake_scan):
+    """The vacant-land filter is `bldg == 0`, so a missing value must land as 0 rather than
+    null — a null would make vacant parcels invisible to the filter that is about them."""
+    features, _ = fake_scan([_row("A", existing_building_sf=None)])
+    assert features[0]["properties"]["bldg"] == 0
 
 
 def test_ssl_never_appears_in_a_tile(fake_scan):

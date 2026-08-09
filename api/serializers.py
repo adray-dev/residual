@@ -393,4 +393,6 @@ def labels_block() -> dict:
         # number's meaning, not a styling choice: `soft_cost_pct` is 0.2 on the wire and
         # must be edited as 20%.
         "assumption_kind": {k: v[1] for k, v in vocab.ASSUMPTION_FIELDS.items()},
+        # The bare noun, for a row already headed "Limited by".
+        "binding_constraint_short": dict(vocab.BINDING_CONSTRAINT_SHORT),
     }

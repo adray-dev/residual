@@ -410,6 +410,10 @@ export function App() {
       </header>
 
       <main className={styles.main}>
+        {meta && vocab && (
+          <Filters meta={meta} vocab={vocab} state={filters} onChange={setFilters} />
+        )}
+
         <div className={styles.mapArea}>
           {meta?.tileset_url ? (
             <MapView
@@ -437,15 +441,12 @@ export function App() {
           )}
 
           {meta && vocab && (
-            <>
-              <Filters meta={meta} vocab={vocab} state={filters} onChange={setFilters} />
-              <Legend
-                meta={meta}
-                vocab={vocab}
-                objective={objective}
-                onObjectiveChange={setObjective}
-              />
-            </>
+            <Legend
+              meta={meta}
+              vocab={vocab}
+              objective={objective}
+              onObjectiveChange={setObjective}
+            />
           )}
 
           {selection && vocab && (
