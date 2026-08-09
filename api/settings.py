@@ -29,5 +29,10 @@ class Settings:
     # Page ceiling for /map/query. The table view pages; the map reads tiles, not this.
     max_page_size: int = 5_000
 
+    # The table's Return column runs the full model once per VISIBLE row. A page is tens of
+    # rows, so this is bounded by page size rather than by the filtered set — unlike the
+    # return FILTER, which has to score everything matching and is bounded far higher.
+    max_returns_per_page: int = 100
+
 
 settings = Settings()

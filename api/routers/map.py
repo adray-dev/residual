@@ -22,7 +22,9 @@ from data import repositories as repo
 router = APIRouter(prefix="/map", tags=["map"])
 
 
-def _run(conn, batch: datetime, req: MapQueryRequest) -> MapQueryResponse:
+def _run(
+    conn, batch: datetime, req: MapQueryRequest, with_returns: bool = False
+) -> MapQueryResponse:
     limit = min(req.limit, settings.max_page_size)
     sort_key = req.sort_key or req.objective
 
@@ -90,6 +92,24 @@ def _run(conn, batch: datetime, req: MapQueryRequest) -> MapQueryResponse:
             irr_filter_applied=True,
         )
 
+    # --- the table's Return column ------------------------------------------
+    # Levered IRR is absent from the bake (SPEC §9), so a table that shows it has to run
+    # the full model. Scoped to the VISIBLE PAGE, which is tens of rows: the filter above
+    # scores the whole matching set and is bounded far higher for that reason.
+    page_returns: dict[str, float | None] = {}
+    if with_returns:
+        if len(rows) > settings.max_returns_per_page:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Returns are computed per row and this page holds {len(rows):,} "
+                    f"(limit {settings.max_returns_per_page:,}). Ask for a smaller page."
+                ),
+            )
+        for row in rows:
+            if row["status"] == "scored":
+                page_returns[row["ssl"]] = irr_for_row(conn, row, batch)
+
     return MapQueryResponse(
         computed_at=batch,
         total=total,
@@ -98,7 +118,7 @@ def _run(conn, batch: datetime, req: MapQueryRequest) -> MapQueryResponse:
         objective=req.objective,
         sort_key=sort_key,
         sort_dir=req.sort_dir,
-        rows=[ser.parcel_row(r) for r in rows],
+        rows=[ser.parcel_row(r, irr=page_returns.get(r["ssl"])) for r in rows],
         irr_filter_applied=irr_applied,
     )
 
@@ -106,11 +126,12 @@ def _run(conn, batch: datetime, req: MapQueryRequest) -> MapQueryResponse:
 @router.post("/query", response_model=MapQueryResponse)
 def post_map_query(
     req: MapQueryRequest,
+    with_returns: bool = False,
     conn=Depends(get_conn),
     batch: datetime = Depends(current_batch),
 ) -> MapQueryResponse:
     """Body form. Required for the draw-an-area polygon, which will not fit in a URL."""
-    return _run(conn, batch, req)
+    return _run(conn, batch, req, with_returns)
 
 
 @router.get("/query", response_model=MapQueryResponse)
@@ -134,6 +155,7 @@ def get_map_query(
     sort_dir: str = "desc",
     limit: int = 200,
     offset: int = 0,
+    with_returns: bool = False,
 ) -> MapQueryResponse:
     """Query-string form, per SPEC §10's `GET /map/query?bounds&filters`."""
     bounds = None
@@ -164,4 +186,4 @@ def get_map_query(
         limit=limit,
         offset=offset,
     )
-    return _run(conn, batch, req)
+    return _run(conn, batch, req, with_returns)

@@ -1,0 +1,358 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--surface);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- header --------------------------------------------------------------- */
+.bar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.wordmark {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--canvas);
+  border-radius: var(--r-control);
+  padding: 2px;
+}
+
+.segment {
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-60);
+}
+
+.segment.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+
+.spacer {
+  margin-left: auto;
+}
+
+.ghost {
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 13px;
+  border-radius: var(--r-button);
+}
+
+.ghost:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dark {
+  border: 0;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: var(--r-button);
+}
+
+.dark:disabled {
+  background: var(--ink-25);
+  cursor: default;
+}
+
+/* --- filter bar ----------------------------------------------------------- */
+.filters {
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--hairline);
+  overflow-x: auto;
+}
+
+.parcelCount {
+  font-size: 12.5px;
+  color: var(--ink-60);
+  white-space: nowrap;
+}
+
+.parcelCount b {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-pill);
+  padding: 4px 6px 4px 11px;
+  font-size: 11.5px;
+  color: var(--ink-60);
+  white-space: nowrap;
+}
+
+.chipX {
+  border: 0;
+  background: transparent;
+  color: var(--ink-25);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 3px;
+  border-radius: 50%;
+}
+
+.chipX:hover {
+  color: var(--negative);
+}
+
+.caption {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--ink-40);
+  white-space: nowrap;
+}
+
+/* --- table ---------------------------------------------------------------- */
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The handoff's exact template. The five money/percent columns share a width so the
+   numeric rhythm down the table is even. */
+.row {
+  display: grid;
+  grid-template-columns: 34px 236px 76px 112px 110px 110px 110px 132px 84px 84px 1fr;
+  align-items: center;
+  gap: 0;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 38px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline-strong);
+}
+
+.th {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-40);
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.th.num {
+  justify-content: flex-end;
+}
+
+.sortable {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sortable:hover {
+  color: var(--ink);
+}
+
+.th.active {
+  color: var(--ink);
+}
+
+.arrow {
+  font-size: 8px;
+}
+
+.data {
+  height: 46px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.data:hover {
+  background: var(--accent-tint);
+}
+
+.data.zebra {
+  background: var(--surface-alt);
+}
+
+.data.zebra:hover {
+  background: var(--accent-tint);
+}
+
+.cell {
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--ink);
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+/* The feasibility value is the column the whole table exists to rank, so it is heavier. */
+.cell.headline {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.parcelCell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 10px;
+  min-width: 0;
+}
+
+.parcelName {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parcelId {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-40);
+}
+
+.textCell {
+  padding: 0 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-60);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.buildChip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: var(--r-tag);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.check input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+.openCell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+}
+
+.open {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 5px;
+}
+
+.open:hover {
+  background: var(--accent-tint);
+}
+
+/* --- paging --------------------------------------------------------------- */
+.foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-alt);
+}
+
+.page {
+  font-size: 12px;
+  color: var(--ink-60);
+}
+
+.page b {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.note {
+  font-size: 11px;
+  color: var(--ink-40);
+  margin-left: auto;
+}
+
+.state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--ink-40);
+  font-size: 13px;
+}

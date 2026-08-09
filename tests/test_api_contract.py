@@ -318,3 +318,56 @@ def test_default_assumptions_hide_provenance(client):
     payload = client.get("/assumptions/default").text
     for tag in ("provenance", "national", "submarket_tag"):
         assert tag not in payload.lower()
+
+
+# ---------------------------------------------------------------------------
+# the table's Return column (screen 1d)
+# ---------------------------------------------------------------------------
+def test_returns_are_computed_for_the_visible_page_only(client):
+    """Levered IRR is absent from the bake, so a table showing it runs the full model per
+    row. Scoped to the page: the whole scored set would be ~26 minutes of engine time."""
+    plain = client.get("/map/query", params={"statuses": ["scored"], "limit": 5}).json()
+    withr = client.get(
+        "/map/query", params={"statuses": ["scored"], "limit": 5, "with_returns": True}
+    ).json()
+
+    assert all(row["irr"] is None for row in plain["rows"])
+    assert any(row["irr"] is not None for row in withr["rows"])
+    # Same rows, same order — the flag adds a column, it does not change the query.
+    assert [r["parcel_id"] for r in plain["rows"]] == [r["parcel_id"] for r in withr["rows"]]
+
+
+def test_a_page_return_matches_a_direct_underwrite(client):
+    row = client.get(
+        "/map/query", params={"statuses": ["scored"], "limit": 1, "with_returns": True}
+    ).json()["rows"][0]
+    full = client.get(f"/parcel/{row['parcel_id']}/underwrite").json()
+    assert row["irr"] == pytest.approx(full["returns"]["irr"], abs=1e-9)
+
+
+def test_an_oversized_page_of_returns_is_refused_with_a_number(client):
+    """Refusing with the actual limit beats timing out, and beats silently truncating."""
+    response = client.get(
+        "/map/query", params={"statuses": ["scored"], "limit": 500, "with_returns": True}
+    )
+    assert response.status_code == 422
+    assert "limit" in response.json()["detail"].lower()
+
+
+def test_sorting_is_server_side_across_the_whole_match_set(client):
+    """The table sorts by asking the server, never by reordering the loaded page — sorting
+    a slice and presenting it as the ranking is the worst thing a table can do."""
+    for key in ("rlv_total", "noi", "total_development_cost", "yield_on_cost"):
+        desc = client.get(
+            "/map/query", params={"statuses": ["scored"], "limit": 25, "sort_key": key}
+        ).json()
+        values = [r[key] for r in desc["rows"] if r[key] is not None]
+        assert values == sorted(values, reverse=True), key
+        assert desc["sort_key"] == key
+
+        asc = client.get(
+            "/map/query",
+            params={"statuses": ["scored"], "limit": 25, "sort_key": key, "sort_dir": "asc"},
+        ).json()
+        ascending = [r[key] for r in asc["rows"] if r[key] is not None]
+        assert ascending == sorted(ascending), key

@@ -46,6 +46,7 @@ import { MapView } from "./components/MapView";
 import { Popup } from "./components/Popup";
 import { Compare, CompareTray } from "./components/Compare";
 import { Shortlist } from "./components/Shortlist";
+import { Table } from "./components/Table";
 import { MAX_COMPARE, toggleCompare } from "./lib/compare";
 import styles from "./App.module.css";
 
@@ -94,6 +95,7 @@ export function App() {
   const [listOpen, setListOpen] = useState(false);
   const [listBusy, setListBusy] = useState(false);
   const [memberOf, setMemberOf] = useState<string[]>([]);
+  const [tableOpen, setTableOpen] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -365,8 +367,12 @@ export function App() {
       <header className={styles.topbar}>
         <Logo />
         <span className={styles.wordmark}>Residual</span>
+        <button className={styles.topAction} onClick={() => setTableOpen(true)}>
+          Table view
+        </button>
         <button
           className={styles.topAction}
+          style={{ marginLeft: 0 }}
           onClick={() => {
             setListOpen(true);
             if (!listDetail && lists[0]) openList(lists[0].shortlist_id);
@@ -493,6 +499,25 @@ export function App() {
           <div className={`${styles.panelState} ${styles.error}`}>{panel.message}</div>
         )}
       </main>
+
+      {tableOpen && vocab && (
+        <Table
+          filters={filters}
+          vocab={vocab}
+          selected={compareIds}
+          onFiltersChange={setFilters}
+          onToggleSelect={(parcelId) =>
+            setCompareIds((ids) => toggleCompare(ids, parcelId))
+          }
+          onCompare={openCompare}
+          onOpenParcel={(parcelId) => {
+            setTableOpen(false);
+            setSelectedFromLink(parcelId);
+            underwrite(parcelId);
+          }}
+          onShowMap={() => setTableOpen(false)}
+        />
+      )}
 
       {listOpen && vocab && (
         <Shortlist
