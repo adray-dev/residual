@@ -42,7 +42,7 @@ def _clean(value: Any) -> Any:
 
     The engine returns floats from division chains that can produce non-finite values on
     degenerate parcels. JSON has no NaN, and a silently-dropped field reads as "no data"
-    anyway — so normalise here rather than emitting invalid JSON.
+    anyway — so normalize here rather than emitting invalid JSON.
     """
     if isinstance(value, float) and not math.isfinite(value):
         return None
@@ -177,7 +177,7 @@ def underwrite_response(result: dict) -> dict:
     """A full-tier result -> the 1b drill-down payload.
 
     Assembled here rather than in the router so the underwrite endpoints, the scenario
-    save, and the export all serialise one result the same way.
+    save, and the export all serialize one result the same way.
     """
     import numpy as np
 

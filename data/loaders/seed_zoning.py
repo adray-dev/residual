@@ -227,7 +227,7 @@ SEED: list[dict] = [
     # incompatible with PDR uses, INCLUDING RESIDENTIAL USES". Residential is not a
     # matter-of-right use here, so `fit_program` raises NotPermitted for every prototype and
     # the parcel bakes as `infeasible` ("no admissible prototype") rather than as
-    # `zone_not_encoded`. That is honest colouring: these parcels are represented and the
+    # `zone_not_encoded`. That is honest coloring: these parcels are represented and the
     # map can say why they are not developable as housing, instead of "not yet covered".
     # FAR is the § 201.3 "All Other Uses" column (not the § 201.2 PDR-use column), heights
     # from Table J § 203.2. Both are recorded for completeness; with no permitted

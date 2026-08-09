@@ -212,7 +212,7 @@ def test_setting_an_input_to_its_default_is_not_an_edit(client, scored):
 
 
 def test_unknown_override_keys_are_ignored_not_invented(client, scored):
-    """An unrecognised key must not widen the model's input surface."""
+    """An unrecognized key must not widen the model's input surface."""
     body = client.post(
         f"/parcel/{scored}/underwrite", json={"cost": {"totally_made_up_input": 999}}
     ).json()
@@ -244,7 +244,7 @@ def test_trying_another_prototype_changes_the_program(client):
 # failure modes degrade, never crash (SPEC fix #8)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("status", ["exempt", "historic", "zone_not_encoded", "infeasible"])
-def test_unmodellable_parcels_explain_themselves(client, status):
+def test_unmodelable_parcels_explain_themselves(client, status):
     """Exempt/historic/unencoded/infeasible are real answers about a parcel, not faults."""
     rows = client.get("/map/query", params={"statuses": [status], "limit": 1}).json()["rows"]
     response = client.get(f"/parcel/{rows[0]['parcel_id']}/underwrite")

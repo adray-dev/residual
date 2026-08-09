@@ -1,7 +1,7 @@
-/** The map's colour contract, as MapLibre expressions.
+/** The map's color contract, as MapLibre expressions.
  *
  * Nothing here computes a value. The bake wrote a bin per objective into the tile
- * (`bin` / `bin_sf` / `bin_gap`) precisely so colouring is a lookup and switching
+ * (`bin` / `bin_sf` / `bin_gap`) precisely so coloring is a lookup and switching
  * objectives needs no server call — SPEC §9 forbids the read path from dividing. So these
  * expressions only ever `match` on an integer that is already in the tile.
  *
@@ -38,9 +38,9 @@ export const RAMP = [
  * A diverging measure needs two hues meeting at a light midpoint, which is what this is.
  *
  * These are ColorBrewer's PiYG, chosen over a hand-picked green/pink because the obvious
- * pairing fails colour-vision checks badly: a saturated green against a saturated pink
+ * pairing fails color-vision checks badly: a saturated green against a saturated pink
  * separated by only ΔE 5.7 under deuteranopia, which would make "loses money" and "makes
- * money" the same colour for roughly one man in twenty. PiYG separates at ΔE 11.9 deutan
+ * money" the same color for roughly one man in twenty. PiYG separates at ΔE 11.9 deutan
  * and 35.7 in normal vision — verified with the palette validator, not eyeballed.
  */
 export const VALUE_RAMP = [
@@ -58,7 +58,7 @@ export const VALUE_RAMP = [
  *
  * Two rules govern these. They must sit outside the value ramp so unscored land never
  * reads as a value — and now that the ramp OWNS magenta, historic can no longer be the
- * mauve it was, or "restricted" and "loses money" would be the same colour. They are also
+ * mauve it was, or "restricted" and "loses money" would be the same color. They are also
  * deliberately desaturated: these parcels are context, not the story, and greys let the
  * ramp carry the eye. Identity comes from the legend label and, for two of them, texture.
  *
@@ -95,7 +95,7 @@ export const OBJECTIVE_METRIC: Record<string, string> = {
   gap: "feasibility_gap",
 };
 
-/** Fill colour for scored parcels: a match on the pre-baked bin, nothing computed. */
+/** Fill color for scored parcels: a match on the pre-baked bin, nothing computed. */
 export function valueRamp(objective: string): ExpressionSpecification {
   const field = BIN_FIELD[objective] ?? "bin";
   return [
@@ -111,7 +111,7 @@ export function valueRamp(objective: string): ExpressionSpecification {
     4, VALUE_RAMP[7],
     // Bin 0 is "unscored on this objective" — a scored parcel can still have no
     // feasibility gap, because gap needs an assessed land value the parcel may not have.
-    // It gets the ramp's lightest step rather than a value colour it has not earned.
+    // It gets the ramp's lightest step rather than a value color it has not earned.
     VALUE_RAMP[3],
   ] as ExpressionSpecification;
 }

@@ -223,7 +223,7 @@
   margin-top: 3px;
 }
 
-/* The three metrics share size and weight and differ only in colour — an explicit
+/* The three metrics share size and weight and differ only in color — an explicit
    correction in the handoff, kept deliberately. */
 .metrics {
   display: flex;

@@ -46,13 +46,43 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
+.gradientWrap {
+  position: relative;
+  margin: 12px 0 5px;
+  padding-bottom: 13px;
+}
+
 .gradient {
   height: 9px;
   border-radius: 5px;
-  margin: 12px 0 5px;
+}
+
+/* The $0 mark. The ramp diverges at zero, so saying where that is turns the bar from a
+   pretty gradient into something a reader can locate a parcel on. */
+.zeroTick {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  width: 1.5px;
+  height: 13px;
+  background: var(--ink);
+  transform: translateX(-50%);
+  border-radius: 1px;
+}
+
+.zeroLabel {
+  position: absolute;
+  left: 50%;
+  top: 13px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--ink-60);
 }
 
 .ends {
+  margin-top: 2px;
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);

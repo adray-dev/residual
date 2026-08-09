@@ -282,7 +282,7 @@ class AssumptionSet(BaseModel):
 
     Provenance is deliberately NOT exposed: the engine tracks national/submarket/local
     sourcing, and the handoff's language rules say the UI shows values only. Confidence is
-    the one number that summarises it.
+    the one number that summarizes it.
     """
     assumption_set_id: str
     name: str
@@ -456,7 +456,7 @@ class FeasibilityValue(BaseModel):
     """Both tiers, side by side. SPEC §11 accepts that they diverge; the UI must label it.
 
     `full` is the levered IRR-based RLV (§6.8) and leads the panel. `screening` is the
-    unlevered margin-based RLV (§3.4) — the number the MAP is coloured by, recomputed here
+    unlevered margin-based RLV (§3.4) — the number the MAP is colored by, recomputed here
     under the same assumptions so any difference is the tier split and not stale inputs.
     """
     full: float
@@ -479,7 +479,7 @@ class SourcesUses(BaseModel):
     uses_total: float
     sources_total: float
     balanced: bool = Field(
-        description="Sources equal uses to within $1. False means a modelling bug, not a "
+        description="Sources equal uses to within $1. False means a modeling bug, not a "
                     "rounding artefact — the UI should not draw the chart."
     )
 

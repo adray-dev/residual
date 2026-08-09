@@ -70,7 +70,7 @@ async function main() {
     zoom: 11,
   });
 
-  // Colour by the baked bin: a pure lookup, no division and no server call (SPEC §9/§10).
+  // Color by the baked bin: a pure lookup, no division and no server call (SPEC §9/§10).
   const fill = ['case',
     ['==', ['get', 'status'], 'scored'],
       ['match', ['to-string', ['get', 'bin']],

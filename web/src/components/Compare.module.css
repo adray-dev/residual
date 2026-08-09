@@ -142,7 +142,7 @@
 }
 
 /* A highlighted row is one of the three figures a developer actually decides on. It gets a
-   wash, larger type, and the COLUMN's colour — which is why the colour is positional: the
+   wash, larger type, and the COLUMN's color — which is why the color is positional: the
    emphasis says "this metric matters", never "this column won". */
 .highlight {
   background: #f6faf9;

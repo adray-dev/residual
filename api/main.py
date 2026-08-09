@@ -2,7 +2,7 @@
 
 Two tiers, and the split is the product's central honesty claim:
 
-  * the BAKED screening layer — fast, all 132,632 parcels, powers map colour, filtering,
+  * the BAKED screening layer — fast, all 132,632 parcels, powers map color, filtering,
     and the table. Every endpoint that touches it reads `bake_results` and never runs the
     engine.
   * the FULL model — levered, monthly, IRR-solved, one parcel at a time. It runs in

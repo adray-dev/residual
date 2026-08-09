@@ -1,8 +1,8 @@
-/** The map legend: what the colours mean, and the control that switches objective.
+/** The map legend: what the colors mean, and the control that switches objective.
  *
- * SPEC §9's rule is that every colour on the map is explainable, so this lists both systems
+ * SPEC §9's rule is that every color on the map is explainable, so this lists both systems
  * the map uses: the diverging value ramp, and the neutrals for land the model cannot price.
- * A legend showing only the ramp would leave 40% of DC's parcels coloured by nothing the
+ * A legend showing only the ramp would leave 40% of DC's parcels colored by nothing the
  * reader can look up.
  */
 import type { Meta } from "../lib/types";
@@ -21,7 +21,6 @@ import styles from "./Legend.module.css";
 const SEGMENT_COPY: Record<string, string> = {
   rlv_total: "Total",
   rlv_per_buildable_sf: "Per SF",
-  gap: "vs. assessed",
 };
 
 /** Per-SF figures are single-digit dollars — compacting them would erase the number. */
@@ -46,7 +45,7 @@ export function Legend({
   const positive = ramp?.positive_count ?? 0;
   const scored = negative + positive;
 
-  // SPEC §9: every colour on the map is explainable, so every status the bake can emit is
+  // SPEC §9: every color on the map is explainable, so every status the bake can emit is
   // listed with its count. Order runs lightest to darkest, which is also roughly least to
   // most restricted.
   const statuses: [keyof typeof STATUS_COLORS, string][] = [
@@ -58,9 +57,8 @@ export function Legend({
 
   return (
     <div className={styles.panel}>
-      <div className={`micro-label ${styles.heading}`}>Color by</div>
       <div className={styles.segmented} role="tablist">
-        {meta.objectives.map((key) => (
+        {meta.objectives.filter((key) => key !== "gap").map((key) => (
           <button
             key={key}
             role="tab"
@@ -74,18 +72,22 @@ export function Legend({
         ))}
       </div>
 
-      <div className={styles.gradient} style={{ background: LEGEND_GRADIENT }} />
+      <div className={styles.gradientWrap}>
+        <div className={styles.gradient} style={{ background: LEGEND_GRADIENT }} />
+        {/* $0 sits at the exact midpoint: the ramp is quantile-binned into four bins per
+            arm, so four of eight stops fall either side of zero by construction. */}
+        <span className={styles.zeroTick} aria-hidden="true" />
+        <span className={styles.zeroLabel}>$0</span>
+      </div>
       <div className={styles.ends}>
         <span>{rampEnd(objective, ramp?.min ?? null)}</span>
         <span>{rampEnd(objective, ramp?.max ?? null)}</span>
       </div>
 
-      {/* Where the ramp crosses zero, stated rather than left to be inferred from a hue. */}
       {scored > 0 && (
         <div className={styles.zero}>
-          Magenta below $0, green above.{" "}
-          <strong>{Math.round((negative / scored) * 100)}%</strong> of scored parcels price
-          below it.
+          <strong>{Math.round((positive / scored) * 100)}%</strong> of scored parcels are
+          positive.
         </div>
       )}
 

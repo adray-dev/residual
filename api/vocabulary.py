@@ -21,7 +21,7 @@ METRIC_LABELS: dict[str, tuple[str, str]] = {
     "rlv_total":                 ("Financial feasibility (RLV)", "Residual land value"),
     "rlv_per_buildable_sf":      ("Feasibility value per SF",    "RLV per buildable SF"),
     "feasibility_gap":           ("Value above assessed land",   "Feasibility gap"),
-    "irr":                       ("Annual return",               "Levered IRR"),
+    "irr":                       ("IRR",                         "Levered IRR"),
     "yield_on_cost":             ("Income vs cost",              "Yield on cost"),
     "equity_multiple":           ("Cash back on equity",         "Equity multiple"),
     "noi":                       ("Yearly income (NOI)",         "Stabilized NOI"),

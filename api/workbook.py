@@ -2,7 +2,7 @@
 
 Every figure past the input block is a formula, so an analyst can change an assumption and
 watch it flow through the 52-month model. That carries one real risk — the workbook and the
-Python engine computing different answers — and the whole design here is organised around
+Python engine computing different answers — and the whole design here is organized around
 removing it.
 
 How the two are kept locked together:
@@ -17,7 +17,7 @@ How the two are kept locked together:
   * `tests/test_xlsx_export.py` recomputes the generated workbook with an independent
     formula engine and asserts the Summary tab equals the Python engine to the cent.
 
-Two things are NOT live, and both are labelled in the sheet rather than hidden:
+Two things are NOT live, and both are labeled in the sheet rather than hidden:
 
   * **Residual land value.** The engine solves it with Brent's method — the land value at
     which levered IRR equals the hurdle. In a sheet that is circular (land -> costs -> loan
@@ -83,7 +83,7 @@ def _note(ws, row: int, text: str, warn: bool = False) -> int:
 
 
 class Sheet:
-    """Writes labelled rows and remembers where each value landed.
+    """Writes labeled rows and remembers where each value landed.
 
     Formulas elsewhere reference these by address, so the layout can change without every
     formula in the workbook having to be rewritten by hand.

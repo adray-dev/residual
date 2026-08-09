@@ -9,10 +9,10 @@ import type { Underwrite } from "./types";
 /** The handoff caps comparison at three, and the layout is built for exactly that. */
 export const MAX_COMPARE = 3;
 
-/** Each column owns a colour BY POSITION, not by rank.
+/** Each column owns a color BY POSITION, not by rank.
  *
  * This is deliberate and the handoff calls it out: if the best column were always teal,
- * the eye would read column order as ranking. Fixed positional colour means the superlative
+ * the eye would read column order as ranking. Fixed positional color means the superlative
  * tags — which do follow the data — are the only thing saying who wins. */
 export const COLUMN_COLORS = [
   { key: "teal", solid: "#0e7c7b", tint: "#eaf2f1", text: "#0a5250" },
@@ -29,7 +29,7 @@ export function toggleCompare(ids: string[], parcelId: string): string[] {
 /** Superlatives, awarded per metric to whichever column actually wins it.
  *
  * A column can earn several or none. The handoff's mock happens to show one each, but
- * hard-coding that would mean labelling a column "Highest return" because of where it sits
+ * hard-coding that would mean labeling a column "Highest return" because of where it sits
  * rather than what it earned.
  */
 export interface Superlative {

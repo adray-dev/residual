@@ -112,7 +112,7 @@ def write_addresses(conn, frame: pd.DataFrame, report: AddressReport) -> int:
     """UPDATE existing parcels in place through a staging table. Never inserts.
 
     An SSL present upstream but absent from `parcels` is counted, not created — this
-    loader's job is labelling, and creating parcels here would bypass the condo exclusion
+    loader's job is labeling, and creating parcels here would bypass the condo exclusion
     and every flag `dc_parcels.py` derives.
     """
     with conn.cursor() as cur:
@@ -166,7 +166,7 @@ def run(database_url: str | None = None) -> AddressReport:
 
     print(
         f"      updated {report.updated:,} parcels  "
-        f"(address {report.with_address:,} · neighbourhood {report.with_neighborhood:,} · "
+        f"(address {report.with_address:,} · neighborhood {report.with_neighborhood:,} · "
         f"upstream rows with no parcel {report.unmatched:,})",
         flush=True,
     )

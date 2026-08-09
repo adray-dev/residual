@@ -1,6 +1,6 @@
 /** Sources & uses: the same money counted two ways, so the two totals must match.
  *
- * Drawn as labelled rows on a shared track rather than one segmented bar. Every line item
+ * Drawn as labeled rows on a shared track rather than one segmented bar. Every line item
  * carries its own name and figure, which is what the reader actually wants ("how much is
  * land?"), and it keeps a $10M sliver readable — in a single stacked bar the contingency
  * segment is a few pixels wide and effectively unlabelable.
@@ -8,10 +8,10 @@
  * The track is the group total, so all bars share one baseline and one scale and lengths
  * compare directly, both down a column and between the two groups.
  *
- * Colour is a sequential teal ramp, not a categorical set: these are parts of one
- * magnitude, not independent identities, and every row is already directly labelled, so
+ * Color is a sequential teal ramp, not a categorical set: these are parts of one
+ * magnitude, not independent identities, and every row is already directly labeled, so
  * hue is carrying grouping rather than meaning. Equity is the exception — it takes the
- * handoff's amber, the same colour it has in the S-curve, because it is the one line a
+ * handoff's amber, the same color it has in the S-curve, because it is the one line a
  * developer tracks across both charts.
  */
 import type { SourcesUses as SourcesUsesData } from "../lib/types";
@@ -72,13 +72,13 @@ function Group({
 }
 
 export function SourcesUses({ data }: { data: SourcesUsesData }) {
-  // The server computes this; it is a modelling bug, not a rounding artefact. Drawing the
+  // The server computes this; it is a modeling bug, not a rounding artefact. Drawing the
   // chart anyway would present a broken capital stack as if it balanced.
   if (!data.balanced) {
     return (
       <div className={styles.unbalanced}>
         Sources ({money(data.sources_total)}) and uses ({money(data.uses_total)}) do not
-        balance. The capital stack is not drawn, because the difference is a modelling
+        balance. The capital stack is not drawn, because the difference is a modeling
         error rather than rounding.
       </div>
     );

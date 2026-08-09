@@ -3,9 +3,9 @@
 Two halves, for two different failure modes:
 
   * `bin_index` and `build_features` are pure, so they are tested directly with synthetic
-    rows. What they encode is the map's entire colour contract — a parcel's shade is a
+    rows. What they encode is the map's entire color contract — a parcel's shade is a
     lookup on an attribute baked here, and there is no server call to correct it later.
-    A silent off-by-one in the bin puts the wrong colour on 132,632 parcels.
+    A silent off-by-one in the bin puts the wrong color on 132,632 parcels.
   * the area floor and the per-objective ramps are claims about the real data, so they run
     against the baked database and skip cleanly when there isn't one.
 """
@@ -150,7 +150,7 @@ def test_ssl_never_appears_in_a_tile(fake_scan):
 
 def test_each_objective_is_binned_against_its_own_ramp(fake_scan):
     """Regression guard. `objective_ramp` falls back to the default objective for an
-    unknown key rather than raising, so a typo in BIN_FIELDS would silently colour the
+    unknown key rather than raising, so a typo in BIN_FIELDS would silently color the
     gap ramp with RLV breaks and nothing would look obviously wrong."""
     features, _ = fake_scan([
         _row("A", rlv_total=200_000.0, rlv_per_buildable_sf=42.0, feasibility_gap=150_000.0)
@@ -162,13 +162,13 @@ def test_each_objective_is_binned_against_its_own_ramp(fake_scan):
 
 
 def test_non_scored_parcels_get_the_unscored_bin_even_when_a_number_exists(fake_scan):
-    """A status row can still carry an RLV from a partial run. It must not colour as a
+    """A status row can still carry an RLV from a partial run. It must not color as a
     value — SPEC §10 gives non-scored parcels their own quiet shade."""
     features, _ = fake_scan([_row("A", status="infeasible")])
     properties = features[0]["properties"]
     assert (properties["bin"], properties["bin_sf"], properties["bin_gap"]) == (0, 0, 0)
     assert properties["status"] == "infeasible"
-    # The raw numbers still travel — the drill-down explains them; only the colour is muted.
+    # The raw numbers still travel — the drill-down explains them; only the color is muted.
     assert properties["rlv"] == 200_000.0
 
 
@@ -258,9 +258,9 @@ def test_the_area_floor_never_drops_a_scored_parcel(conn):
 
 
 def test_every_map_objective_resolves_to_its_own_ramp(conn):
-    """`objective_ramp` whitelists via `.get` with a default, so an unrecognised objective
+    """`objective_ramp` whitelists via `.get` with a default, so an unrecognized objective
     comes back as `rlv_total`'s ramp instead of an error. Pin that every key the tile build
-    asks for is genuinely recognised."""
+    asks for is genuinely recognized."""
     batch = repo.latest_batch_at(conn)
     ramps = {o: repo.objective_ramp(conn, o, batch) for o in BIN_FIELDS}
 

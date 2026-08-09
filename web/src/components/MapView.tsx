@@ -1,4 +1,4 @@
-/** The map: real DC parcel geometry from the static PMTiles, coloured by the baked bin.
+/** The map: real DC parcel geometry from the static PMTiles, colored by the baked bin.
  *
  * There is no basemap. That is a choice, not an omission — the handoff's map base is a
  * flat `--canvas` field with a single teal accent, DC's 132,604 parcels are dense enough
@@ -184,7 +184,7 @@ export function MapView({
         },
       });
 
-      // Filtered-OUT parcels are veiled in canvas colour rather than removed. Hiding two
+      // Filtered-OUT parcels are veiled in canvas color rather than removed. Hiding two
       // thirds of the city leaves the matches floating with no street grid to locate them
       // against; dimming keeps the context and still reads instantly as "not these".
       instance.addLayer({

@@ -157,7 +157,7 @@ def full_cashflow(
 
     # ---- revenue (§6.3) ----
     # Same product-type adjustment as screening_rlv (§2.4) — the two must agree, or the
-    # drill-down would contradict the map colour it was opened from.
+    # drill-down would contradict the map color it was opened from.
     rent_psf = effective_rent_psf_monthly(
         market.rent_psf_residential_monthly, program.prototype_id
     )

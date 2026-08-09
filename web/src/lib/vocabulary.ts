@@ -47,7 +47,7 @@ export class Vocabulary {
     return this.lookup("status", key);
   }
 
-  /** "Full underwriting" / "Screening estimate" — the two-tier split, always labelled. */
+  /** "Full underwriting" / "Screening estimate" — the two-tier split, always labeled. */
   tier(key: string): string {
     return this.lookup("tier", key);
   }

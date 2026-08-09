@@ -21,7 +21,7 @@ CREATE TABLE parcels (
   -- NULLABLE on purpose: not every SSL has a premise address (vacant interior lots, ROW
   -- slivers). Readers fall back to the parcel ID rather than rendering a blank label.
   address TEXT,
-  neighborhood TEXT,       -- assessment neighbourhood, e.g. "Old City 2" / "Shaw"
+  neighborhood TEXT,       -- assessment neighborhood, e.g. "Old City 2" / "Shaw"
   lot_area_sf DOUBLE PRECISION,
   zone_code TEXT,          -- NOT a hard FK (fix #1): a parcel in a not-yet-encoded
                            -- district must still load. The bake resolves an unencoded
@@ -38,7 +38,7 @@ CREATE TABLE parcels (
 );
 CREATE INDEX parcels_geom_gix ON parcels USING GIST (parcel_geom);
 -- Typeahead for /parcels/search (Stage D): trigram over the free-text keys, btree over
--- the low-cardinality neighbourhood used by the geography filter chips.
+-- the low-cardinality neighborhood used by the geography filter chips.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX parcels_address_trgm_idx ON parcels USING GIN (address gin_trgm_ops);
 CREATE INDEX parcels_ssl_trgm_idx ON parcels USING GIN (ssl gin_trgm_ops);
@@ -142,7 +142,7 @@ CREATE INDEX bake_rlv_total_idx ON bake_results (computed_at, rlv_total DESC);
 --
 -- MIGRATION NOTE (Stage D, v1.6). The nine screening columns are likewise unbackfillable —
 -- NOI, TDC, and the program shape were never persisted — so they are added empty and
--- repopulated by re-running the bake. Same retention behaviour as above.
+-- repopulated by re-running the bake. Same retention behavior as above.
 --
 --   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS noi DOUBLE PRECISION;
 --   ALTER TABLE bake_results ADD COLUMN IF NOT EXISTS total_development_cost DOUBLE PRECISION;

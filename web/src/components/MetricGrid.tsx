@@ -1,21 +1,17 @@
-/** The 1b metric grid: eight cells, 4 x 2, in the handoff's fixed order.
+/** The 1b metric grid: the five figures the drill-down leads on.
  *
- * The order is not arbitrary and is not sorted — the top row is the return story (how well
- * does this perform) and the bottom row is the money story (what does it cost and produce).
- * Reordering by value would break the comparison a user makes scanning down two parcels.
+ * The order is fixed, not sorted — return first, then what it costs and produces.
+ * Reordering by value would break the comparison a user makes scanning two parcels.
  *
- * One cell needs explaining. "Annual return" is the levered IRR measured at the ASSESSED
- * land value, not at the RLV the panel just solved. At the solved RLV the IRR is the
- * hurdle by construction — that is what the solve does — so it would read 17.00% on every
- * parcel in the city and rank nothing. Measuring at the assessed price gives a number that
- * varies and means something ("if you bought at the assessment, this is your return"), but
- * only if the basis is visible. So the basis is rendered under the value rather than
- * hidden in a tooltip: an unlabelled 18.4% next to a solved RLV invites exactly the wrong
- * reading, that it is the return at the price shown above it.
+ * IRR is measured at the ASSESSED land value, not at the RLV the panel just solved. At the
+ * solved RLV it is the hurdle by construction, so it would read 17.00% on every parcel in
+ * the city and rank nothing. Measuring at the assessed price gives a number that varies and
+ * can be the primary metric. The basis is no longer captioned under the value — the
+ * computation is unchanged, only the annotation is gone.
  */
 import type { ReturnMetrics } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
-import { money, multiple, percent, NO_VALUE } from "../lib/format";
+import { money, percent, NO_VALUE } from "../lib/format";
 import styles from "./MetricGrid.module.css";
 
 interface Cell {
@@ -46,11 +42,10 @@ function returnCell(returns: ReturnMetrics): Cell {
   if (returns.irr == null) {
     return { key: "irr", value: NO_VALUE, note: returns.irr_basis };
   }
-  return {
-    key: "irr",
-    value: percent(returns.irr),
-    note: `at ${returns.irr_basis.toLowerCase()} ${money(returns.irr_basis_value)}`,
-  };
+  // The basis is no longer captioned. It is still the assessed land value — that is what
+  // makes IRR vary per parcel instead of reading as the hurdle on every one — but the
+  // caption was explaining a modeling choice at the cost of the number's legibility.
+  return { key: "irr", value: percent(returns.irr) };
 }
 
 export function MetricGrid({
@@ -62,13 +57,10 @@ export function MetricGrid({
 }) {
   const cells: Cell[] = [
     returnCell(returns),
-    { key: "equity_multiple", value: multiple(returns.equity_multiple) },
     { key: "yield_on_cost", value: percent(returns.yield_on_cost) },
-    { key: "profit_margin", value: percent(returns.profit_margin) },
     { key: "total_development_cost", value: money(returns.total_development_cost) },
     { key: "cost_per_unit", value: money(returns.cost_per_unit) },
     { key: "noi", value: money(returns.noi) },
-    { key: "exit_value", value: money(returns.exit_value) },
   ];
 
   return (

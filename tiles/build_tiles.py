@@ -8,7 +8,7 @@ Two things the tiles carry that the client would otherwise have to compute:
 
   * `bin` / `bin_sf` / `bin_gap` — the diverging quantile ramp index per objective. SPEC §9
     forbids the read path from dividing and §10 wants objective switching to happen
-    client-side with no server call, so the bin is baked in and colouring is a lookup.
+    client-side with no server call, so the bin is baked in and coloring is a lookup.
   * `status` — so non-scored parcels get their own quiet shade rather than reading as
     "low value" on the value ramp.
 

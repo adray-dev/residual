@@ -4,7 +4,7 @@ GET runs the default assumptions, so opening the drill-down is a cacheable, link
 POST carries assumption overrides, because the 1c modal edits ~30 nested fields and SPEC's
 `?assumptions` query form cannot hold them.
 
-An unmodellable parcel (exempt, historic, unencoded, no admissible prototype) returns 422
+An unmodelable parcel (exempt, historic, unencoded, no admissible prototype) returns 422
 with a plain-language reason. Those are real answers ABOUT a parcel, not server faults,
 and the panel renders the reason instead of the numbers.
 """

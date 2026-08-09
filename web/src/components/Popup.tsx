@@ -5,9 +5,9 @@
  * candidates, and it has to stay instant; the levered monthly model is the deliberate
  * next step, taken from the button at the bottom of this card.
  *
- * The number shown here is therefore the SCREENING RLV, the same one the map is coloured
+ * The number shown here is therefore the SCREENING RLV, the same one the map is colored
  * by, and it will not match the full underwriting figure in the panel. SPEC §11 accepts
- * that divergence and requires it be labelled rather than reconciled away, which is what
+ * that divergence and requires it be labeled rather than reconciled away, which is what
  * the "Screening estimate" caption does.
  */
 import { useLayoutEffect, useRef, useState } from "react";

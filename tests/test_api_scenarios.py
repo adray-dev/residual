@@ -190,7 +190,7 @@ def test_an_unknown_scenario_is_a_404_not_an_empty_document(client):
     assert client.get("/scenario/does-not-exist/export").status_code == 404
 
 
-def test_saving_an_unmodellable_parcel_is_refused_with_a_reason(client):
+def test_saving_an_unmodelable_parcel_is_refused_with_a_reason(client):
     """Exempt land cannot be underwritten, so there is nothing to freeze."""
     rows = client.get("/map/query", params={"statuses": ["exempt"], "limit": 1}).json()["rows"]
     response = client.post("/scenario", json={"parcel_id": rows[0]["parcel_id"]})

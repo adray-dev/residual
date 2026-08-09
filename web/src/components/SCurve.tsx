@@ -5,9 +5,9 @@
  * y-scales would let that gap mean nothing.
  *
  * The series are distinguished by dash pattern as well as hue (solid cost, dashed equity),
- * which is what keeps the chart legible in greyscale and for colour-vision deficiency.
+ * which is what keeps the chart legible in greyscale and for color-vision deficiency.
  * That matters more than usual here: the brand teal is deliberately desaturated, so it
- * fails a chroma floor as a chart colour. It is kept because it is *the* accent across the
+ * fails a chroma floor as a chart color. It is kept because it is *the* accent across the
  * product and re-hueing it for one chart would be worse — the dash carries identity, and
  * the pair still separates at ΔE 14 under protanopia against the 8 target.
  *

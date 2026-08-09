@@ -57,7 +57,7 @@ type PanelState =
   | { kind: "ready"; data: Underwrite }
   // `fromEdits` marks a refusal the user caused and can undo. Without it the panel
   // cannot tell "this parcel is a park" from "your exit cap broke the program".
-  | { kind: "not-modellable"; reason: string; fromEdits: boolean }
+  | { kind: "not-modelable"; reason: string; fromEdits: boolean }
   | { kind: "error"; message: string };
 
 interface Selection {
@@ -139,7 +139,7 @@ export function App() {
   const failed = useCallback((error: unknown, fromEdits: boolean): PanelState => {
     // A 422 is an answer about the parcel, not a fault — render the reason.
     if (error instanceof NotModellable) {
-      return { kind: "not-modellable", reason: error.message, fromEdits };
+      return { kind: "not-modelable", reason: error.message, fromEdits };
     }
     if (error instanceof ApiError) return { kind: "error", message: error.message };
     return { kind: "error", message: String(error) };
@@ -242,7 +242,7 @@ export function App() {
       run(parcelId, { overrides: next, demolition })
         .then((data) => {
           // Committed only on success. Storing a rejected set would leave the app holding
-          // inputs that never ran: cancelling out of the modal would look like a recovery
+          // inputs that never ran: canceling out of the modal would look like a recovery
           // while the next demolition toggle silently re-sent the broken values.
           setOverrides(next);
           setPanel({ kind: "ready", data });
@@ -404,8 +404,7 @@ export function App() {
         </button>
         {meta && (
           <span className={styles.batch}>
-            {meta.parcel_count.toLocaleString()} parcels · baked{" "}
-            {new Date(meta.computed_at).toLocaleDateString()}
+            {meta.parcel_count.toLocaleString()} parcels
           </span>
         )}
       </header>
@@ -491,7 +490,7 @@ export function App() {
             onClose={closePanel}
           />
         )}
-        {panel.kind === "not-modellable" && (
+        {panel.kind === "not-modelable" && (
           <NotModellablePanel
             reason={panel.reason}
             recovery={
@@ -576,7 +575,6 @@ export function App() {
           vocab={vocab}
           overrides={overrides}
           displayName={panel.kind === "ready" ? panel.data.display_name : "this parcel"}
-          confidence={panel.kind === "ready" ? panel.data.confidence : 0}
           busy={rerunning}
           error={modalError}
           onApply={applyOverrides}

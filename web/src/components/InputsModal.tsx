@@ -11,12 +11,11 @@
  *
  * Provenance is deliberately absent. The engine tracks national/submarket/local sourcing
  * per input; the handoff's language rules say the UI shows values only, with confidence as
- * the one number that summarises how much to trust them.
+ * the one number that summarizes how much to trust them.
  */
 import { useMemo, useState } from "react";
 import type { AssumptionGroups } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
-import { confidence as formatConfidence } from "../lib/format";
 import {
   EDITABLE_GROUPS,
   changeCount,
@@ -40,7 +39,6 @@ export interface InputsModalProps {
   overrides: Overrides;
   /** Address, never the parcel id — the handoff edits "for {address} only". */
   displayName: string;
-  confidence: number;
   busy: boolean;
   /** Why the last re-underwrite was refused. The modal STAYS OPEN when this is set. */
   error?: string | null;
@@ -54,7 +52,6 @@ export function InputsModal({
   vocab,
   overrides,
   displayName,
-  confidence,
   busy,
   error,
   onApply,
@@ -138,12 +135,6 @@ export function InputsModal({
                 </button>
               );
             })}
-            {/* Confidence, as a percentage and with no explanation — the handoff is
-                explicit that this number carries no helper text. */}
-            <div className={styles.confidence}>
-              <span className="micro-label">Confidence</span>
-              <div className={styles.confidenceValue}>{formatConfidence(confidence)}</div>
-            </div>
           </nav>
 
           <div className={styles.panel}>
@@ -189,7 +180,7 @@ export function InputsModal({
             to fix. The edit that broke it and the message about it belong together. */}
         {error && (
           <div className={styles.error} role="alert">
-            <strong>These inputs cannot be modelled.</strong> {error}
+            <strong>These inputs cannot be modeled.</strong> {error}
           </div>
         )}
 

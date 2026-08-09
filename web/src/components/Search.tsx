@@ -1,14 +1,14 @@
-/** The 1a search field: address, parcel ID, ward, or neighbourhood.
+/** The 1a search field: address, parcel ID, ward, or neighborhood.
  *
  * Picking a result moves the MAP to the parcel and selects it, rather than opening a panel
  * directly. Search on a map screen means "take me there" — landing in a drill-down with no
  * idea where the parcel sits would answer a different question. The full model is still one
  * deliberate click away, from the popup.
  *
- * The placeholder names a real DC neighbourhood rather than the handoff's "Shaw", because
- * the parcel layer stores assessment-district names ("Old City 1", "R. L. A. SW",
- * "Trinidad") and searching Shaw genuinely returns nothing. A placeholder that promises
- * something the data cannot do is worse than a plainer one.
+ * The placeholder names only what a user will actually reach for. Ward and neighborhood
+ * still MATCH — the query covers all four — but they are not advertised: DC stores
+ * assessment-district names ("Old City 1", "R. L. A. SW"), so promising neighborhood
+ * search would set an expectation the data does not meet.
  */
 import { useEffect, useRef, useState } from "react";
 import { searchParcels } from "../lib/api";
@@ -95,7 +95,7 @@ export function Search({
         <input
           className={styles.input}
           value={query}
-          placeholder="Old City 1, Ward 6, 1301 Delaware Ave SW"
+          placeholder="Address or parcel ID"
           aria-label="Search parcels"
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => results.length && setOpen(true)}
@@ -128,9 +128,7 @@ export function Search({
           >
             ×
           </button>
-        ) : (
-          <span className={styles.hint}>address · parcel ID · ward</span>
-        )}
+        ) : null}
       </div>
 
       {open && (

@@ -275,7 +275,7 @@ export interface SourcesUses {
   sources: Record<string, number>;
   uses_total: number;
   sources_total: number;
-  /** False means a modelling bug, not rounding — do not draw the chart. */
+  /** False means a modeling bug, not rounding — do not draw the chart. */
   balanced: boolean;
 }
 

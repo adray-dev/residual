@@ -45,7 +45,7 @@ def scored_parcel_id(client):
 # /meta
 # ---------------------------------------------------------------------------
 def test_meta_reports_every_parcel_exactly_once(meta):
-    """SPEC §9: every parcel gets a row and every colour is explainable, so the status
+    """SPEC §9: every parcel gets a row and every color is explainable, so the status
     counts must sum to the parcel count with nothing unaccounted for."""
     with repo.connection() as conn:
         assert meta["parcel_count"] == repo.count_parcels(conn)
@@ -63,7 +63,9 @@ def test_meta_serves_the_vocabulary_so_the_client_keeps_no_copy(meta):
         "assumption_group", "assumption", "assumption_kind",
     }
     # The handoff's language rules, spot-checked.
-    assert labels["metric"]["irr"] == "Annual return"
+    # "IRR", not a plain-language gloss: the audience reads pro formas, and the metric is
+    # the primary one the table ranks on.
+    assert labels["metric"]["irr"] == "IRR"
     assert labels["metric"]["ssl"] == "Parcel ID"
     assert labels["prototype"]["garden"] == "Garden walk-up"
     assert labels["construction"]["wood_v"] == "Wood frame"
@@ -74,7 +76,7 @@ def test_meta_serves_the_vocabulary_so_the_client_keeps_no_copy(meta):
     }
 
 
-def test_every_editable_assumption_is_labelled_and_has_a_unit(meta, client):
+def test_every_editable_assumption_is_labeled_and_has_a_unit(meta, client):
     """The 1c modal is driven by /assumptions/default, so every key it will render needs a
     label and a unit kind. A key with a value but no unit would be shown raw — and `0.2`
     presented where `20%` was meant is a 100x error in the user's model, silently."""
@@ -85,11 +87,11 @@ def test_every_editable_assumption_is_labelled_and_has_a_unit(meta, client):
         assert group in labels["assumption_group"], group
         for key, value in defaults[group].items():
             if key in vocab.HIDDEN_ASSUMPTION_KEYS:
-                assert key not in labels["assumption"], f"{key} is hidden but also labelled"
+                assert key not in labels["assumption"], f"{key} is hidden but also labeled"
                 continue
             assert key in labels["assumption"], f"{group}.{key} has no label"
             assert key in labels["assumption_kind"], f"{group}.{key} has no unit kind"
-            # A labelled input must be a scalar the modal can put in one field.
+            # A labeled input must be a scalar the modal can put in one field.
             assert isinstance(value, (int, float)) and not isinstance(value, bool), key
 
     assert set(labels["assumption"]) == set(labels["assumption_kind"])
@@ -98,7 +100,7 @@ def test_every_editable_assumption_is_labelled_and_has_a_unit(meta, client):
     }
 
 
-def test_no_labelled_assumption_is_one_the_engine_would_ignore(meta, client):
+def test_no_labeled_assumption_is_one_the_engine_would_ignore(meta, client):
     """`build_assumptions` drops unknown keys silently. An input offered in the modal that
     the engine then ignores looks like the model disagreeing with the user."""
     defaults = client.get("/assumptions/default").json()

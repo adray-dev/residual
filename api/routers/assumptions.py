@@ -6,7 +6,7 @@ monetary and area default.
 
 Provenance is deliberately NOT in the payload. The engine tags every input
 national/submarket/local for the confidence score, but the handoff's language rules say
-the UI shows values only — confidence is the one number that summarises sourcing.
+the UI shows values only — confidence is the one number that summarizes sourcing.
 """
 from __future__ import annotations
 

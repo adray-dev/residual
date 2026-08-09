@@ -350,6 +350,17 @@
   margin-left: auto;
 }
 
+/* A refused sort keeps the previous rows below it — amber, because the model declining to
+   rank 79,073 parcels is a bound being enforced, not a fault. */
+.banner {
+  padding: 10px 20px;
+  background: var(--amber-tint);
+  border-bottom: 1px solid rgba(192, 138, 62, 0.35);
+  color: var(--amber-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .state {
   padding: 60px 20px;
   text-align: center;

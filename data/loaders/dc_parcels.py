@@ -204,7 +204,7 @@ def apply_cama(
 
     # `merge` returns a fresh RangeIndex, so every derived column below must be computed
     # from the merged frame — never from a Series built before the merge.
-    # Address and neighbourhood come off the same layer (Stage D). Derived before the
+    # Address and neighborhood come off the same layer (Stage D). Derived before the
     # CAMA merge, via the shared rule in `dc_addresses`, so a full re-pull and the
     # standalone backfill produce identical values.
     parcels[["address", "neighborhood"]] = derive_address_columns(parcels)

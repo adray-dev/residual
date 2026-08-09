@@ -31,16 +31,66 @@ def _run(
     filters = req.filters.model_dump()
     irr_min = filters.pop("irr_min", None)
 
+    # Ranking by IRR means scoring every matching row, not just the page: levered IRR is
+    # absent from the bake (SPEC §9), so there is no column to ORDER BY. It reuses the
+    # return filter's path and its bound for exactly that reason — sorting a page and
+    # calling it a ranking is the thing a table must never do.
+    sort_by_irr = sort_key == repo.IRR_SORT_KEY
+
     rows, total = repo.map_query(
         conn,
         computed_at=batch,
         bounds=req.bounds.as_tuple() if req.bounds else None,
         filters=filters,
+        # IRR has no column; the fallback sort keeps the page deterministic while the
+        # scored-and-sorted set is assembled below.
         sort_key=sort_key,
         sort_dir=req.sort_dir,
         limit=limit,
         offset=req.offset,
     )
+
+    # --- ranking by IRR ------------------------------------------------------
+    if sort_by_irr and irr_min is None:
+        if total > settings.max_irr_filter_parcels:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Sorting by IRR runs the full underwriting model on every matching "
+                    f"parcel, and {total:,} is too many (limit "
+                    f"{settings.max_irr_filter_parcels:,}). Narrow the filters first."
+                ),
+            )
+        all_rows, _ = repo.map_query(
+            conn,
+            computed_at=batch,
+            bounds=req.bounds.as_tuple() if req.bounds else None,
+            filters=filters,
+            sort_key=repo.DEFAULT_MAP_OBJECTIVE,
+            sort_dir="desc",
+            limit=settings.max_irr_filter_parcels,
+            offset=0,
+        )
+        scored_rows = [(row, irr_for_row(conn, row, batch)) for row in all_rows]
+        # A parcel with no assessed value has no IRR. It sorts to the BOTTOM in both
+        # directions — it is an absence, not a very small or very large number, and
+        # treating it as either would rank it against parcels that have an answer.
+        reverse = str(req.sort_dir).lower() != "asc"
+        scored_rows.sort(
+            key=lambda pair: (pair[1] is None, -(pair[1] or 0.0) if reverse else (pair[1] or 0.0))
+        )
+        page = scored_rows[req.offset : req.offset + limit]
+        return MapQueryResponse(
+            computed_at=batch,
+            total=total,
+            returned=len(page),
+            offset=req.offset,
+            objective=req.objective,
+            sort_key=sort_key,
+            sort_dir=req.sort_dir,
+            rows=[ser.parcel_row(r, irr=v) for r, v in page],
+            irr_filter_applied=False,
+        )
 
     # --- the IRR filter -----------------------------------------------------
     # Levered IRR does not exist in the screening tier (SPEC §9 excludes it from the bake
@@ -77,6 +127,8 @@ def _run(
             irr = irr_for_row(conn, row, batch)
             if irr is not None and irr >= irr_min:
                 kept.append((row, irr))
+        if sort_by_irr:
+            kept.sort(key=lambda pair: pair[1], reverse=str(req.sort_dir).lower() != "asc")
         total = len(kept)
         page = kept[req.offset : req.offset + limit]
         irr_applied = True

@@ -3,8 +3,8 @@
  * Every column is a full-tier underwrite, not a row off the map query — annual return and
  * equity multiple do not exist in the screening layer.
  *
- * The colour rule is the load-bearing design decision here. Each column owns a colour by
- * POSITION (teal, slate, amber), and the superlative tags follow the DATA. If colour
+ * The color rule is the load-bearing design decision here. Each column owns a color by
+ * POSITION (teal, slate, amber), and the superlative tags follow the DATA. If color
  * tracked rank instead, column order would read as ranking and the first column would look
  * like the answer before anyone had read a number.
  */
@@ -77,7 +77,7 @@ export function Compare({
       <header className={styles.bar}>
         <span className={styles.title}>Compare</span>
         <span className={styles.count}>
-          {rows.length} {rows.length === 1 ? "parcel" : "parcels"} · full underwriting
+          {rows.length} {rows.length === 1 ? "parcel" : "parcels"}
         </span>
         <button className={styles.close} onClick={onClose}>
           Close

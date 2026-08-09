@@ -420,7 +420,7 @@ def test_e_ground_floor_active_exempts_low_rise(proto_id):
 
 
 # ---------------------------------------------------------------------------
-# Cross-cutting behaviours the spec calls out explicitly.
+# Cross-cutting behaviors the spec calls out explicitly.
 # ---------------------------------------------------------------------------
 def test_feasibility_gap_is_none_when_land_value_missing():
     parcel = Parcel(ssl="1200 0008", lot_area_sf=20_000, zone_code="TEST-H",
@@ -518,7 +518,7 @@ def test_confidence_varies_with_what_the_market_row_actually_sources():
     }
     # Denominator is the size of the input set, not a literal: adding a genuine input is a
     # normal event and should fail `test_provenance_input_set_is_pinned` (which exists to
-    # make that visible), not these two, which are about sourcing behaviour.
+    # make that visible), not these two, which are about sourcing behavior.
     n = len(PROVENANCE)
     assert score_confidence(PROVENANCE, fully_sourced) == pytest.approx(1.0 / n)
     assert score_confidence(PROVENANCE, rent_only) == pytest.approx(0.5 / n)

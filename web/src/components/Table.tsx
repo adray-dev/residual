@@ -1,14 +1,13 @@
 /** Screen 1d: the filtered set as sortable rows.
  *
- * Sorting and paging are SERVER-side. The filtered set runs to tens of thousands of
- * parcels, so sorting the loaded page would silently sort a slice and present it as the
- * ranking — the single most misleading thing a table like this can do.
+ * Sorting and paging are SERVER-side, on every column. The filtered set runs to tens of
+ * thousands of parcels, so sorting the loaded page would silently sort a slice and present
+ * it as the ranking — the single most misleading thing a table like this can do.
  *
- * The Return column is the exception to everything else here: levered IRR does not exist
- * in the bake (SPEC §9), so the server runs the full model once per VISIBLE ROW. That is
- * why the page size is small and why Return is the one column you cannot sort by — ranking
- * on it would mean scoring the whole matching set, which is what the map's return filter is
- * for and why that one is bounded.
+ * IRR is the exception that shapes the rest. It does not exist in the bake (SPEC §9), so
+ * both showing it and ranking by it mean running the full model: per visible row to show
+ * it, and over every match to rank by it. The server bounds the second and refuses with an
+ * actionable sentence rather than fanning out across 79,073 parcels.
  */
 import { useCallback, useEffect, useState } from "react";
 import type { MapQuery, ParcelRow } from "../lib/types";
@@ -21,7 +20,7 @@ import styles from "./Table.module.css";
 
 const PAGE_SIZE = 50;
 
-/** Chip colour per build, from the map's own ramp so the table and the map agree. */
+/** Chip color per build, from the map's own ramp so the table and the map agree. */
 const BUILD_TINT: Record<string, { bg: string; fg: string }> = {
   townhome: { bg: "#eaf2f1", fg: "#0a5250" },
   garden: { bg: "#e9eef4", fg: "#2d5473" },
@@ -45,6 +44,15 @@ interface Column {
  * label is what the drill-down and the map legend show; a table header is a column key. */
 function columnsFor(_vocab: Vocabulary): Column[] {
   return [
+    // IRR leads and is the default sort. Ranking on it means scoring every matching row —
+    // it is not in the bake — so the server bounds it and says so when the set is too big.
+    { key: "irr", label: "IRR", sortKey: "irr", headline: true, render: (r) => percent(r.irr) },
+    {
+      key: "yield_on_cost",
+      label: "Yield",
+      sortKey: "yield_on_cost",
+      render: (r) => percent(r.yield_on_cost),
+    },
     {
       key: "total_development_cost",
       label: "Total cost",
@@ -54,27 +62,14 @@ function columnsFor(_vocab: Vocabulary): Column[] {
     {
       key: "cost_per_unit",
       label: "Cost / unit",
+      sortKey: "cost_per_unit",
       render: (r) =>
         r.total_development_cost && r.unit_count
           ? money(r.total_development_cost / r.unit_count)
           : "—",
     },
     { key: "noi", label: "NOI", sortKey: "noi", render: (r) => money(r.noi) },
-    {
-      key: "rlv_total",
-      label: "Feasibility value",
-      sortKey: "rlv_total",
-      headline: true,
-      render: (r) => money(r.rlv_total),
-    },
-    {
-      key: "yield_on_cost",
-      label: "Yield",
-      sortKey: "yield_on_cost",
-      render: (r) => percent(r.yield_on_cost),
-    },
-    // No sortKey: ranking by return means scoring the whole matching set, not this page.
-    { key: "irr", label: "Return", render: (r) => percent(r.irr) },
+    { key: "rlv_total", label: "RLV", sortKey: "rlv_total", render: (r) => money(r.rlv_total) },
   ];
 }
 
@@ -99,6 +94,9 @@ function chipsFor(state: FilterState, vocab: Vocabulary): { label: string; clear
   if (state.rlvMax != null) {
     chips.push({ label: `Value ≤ ${money(state.rlvMax, 1)}`, clear: { rlvMax: null } });
   }
+  if (state.irrMin != null) {
+    chips.push({ label: `IRR ≥ ${percent(state.irrMin, 1)}`, clear: { irrMin: null } });
+  }
   return chips;
 }
 
@@ -122,6 +120,10 @@ export function Table({
   onShowMap: () => void;
 }) {
   const columns = columnsFor(vocab);
+  // IRR is the PRIMARY column — first, bold, and sortable — but not the default sort.
+  // Ranking by it means scoring every match, and on an unfiltered 79,073 the server rightly
+  // refuses, which would open the table empty. RLV is a stored column and always works, so
+  // it holds the default and IRR is one click away once the set is narrowed.
   const [sortKey, setSortKey] = useState("rlv_total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
@@ -149,6 +151,9 @@ export function Table({
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
+        // The rows already on screen are still true for the sort that produced them, so
+        // they stay. Replacing a full table with a sentence loses the user's place over
+        // what is usually a recoverable refusal.
         setError(err instanceof NotModellable || err instanceof Error ? err.message : String(err));
       })
       .finally(() => setBusy(false));
@@ -197,7 +202,6 @@ export function Table({
   const chips = chipsFor(filters, vocab);
   const total = data?.total ?? 0;
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
-  const sortedLabel = columns.find((c) => c.sortKey === sortKey)?.label ?? sortKey;
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Parcel table">
@@ -248,9 +252,6 @@ export function Table({
             </button>
           </span>
         ))}
-        <span className={styles.caption}>
-          Sorted by {sortedLabel} · click a column to re-sort
-        </span>
       </div>
 
       <div className={styles.scroll}>
@@ -266,31 +267,24 @@ export function Table({
               }`}
               key={column.key}
             >
-              {column.sortKey ? (
-                <button className={styles.sortable} onClick={() => sort(column.sortKey!)}>
-                  {column.label}
-                  {column.sortKey === sortKey && (
-                    <span className={styles.arrow}>{sortDir === "desc" ? "▼" : "▲"}</span>
-                  )}
-                </button>
-              ) : (
-                <span title="Return runs the full model per row, so the table cannot rank by it">
-                  {column.label}
-                </span>
-              )}
+              <button className={styles.sortable} onClick={() => sort(column.sortKey!)}>
+                {column.label}
+                {column.sortKey === sortKey && (
+                  <span className={styles.arrow}>{sortDir === "desc" ? "▼" : "▲"}</span>
+                )}
+              </button>
             </span>
           ))}
           <span className={styles.th}>{vocab.metric("gross_sf")}</span>
         </div>
 
-        {error && <div className={styles.state}>{error}</div>}
-        {!error && busy && !data && <div className={styles.state}>Reading the bake…</div>}
+        {error && <div className={styles.banner} role="alert">{error}</div>}
+        {busy && !data && <div className={styles.state}>Reading the bake…</div>}
         {!error && data?.rows.length === 0 && (
           <div className={styles.state}>No parcels match these filters.</div>
         )}
 
-        {!error &&
-          data?.rows.map((row, index) => {
+        {data?.rows.map((row, index) => {
             const tint = BUILD_TINT[row.prototype_id ?? ""] ?? BUILD_TINT["highrise"]!;
             return (
               <div
@@ -359,10 +353,6 @@ export function Table({
         >
           Next
         </button>
-        <span className={styles.note}>
-          Sorting and paging run on the server across all {total.toLocaleString()} matches.
-          Return is computed per visible row.
-        </span>
       </footer>
     </div>
   );

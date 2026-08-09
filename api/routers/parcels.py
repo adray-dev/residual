@@ -23,7 +23,7 @@ NONE_PROTOTYPE = repo.NONE_PROTOTYPE
 
 @router.get("/parcels/search")
 def search(q: str = "", limit: int = 10, conn=Depends(get_conn)) -> dict:
-    """Typeahead: address · parcel ID · ward · neighbourhood (the handoff's hint text)."""
+    """Typeahead: address · parcel ID · ward · neighborhood (the handoff's hint text)."""
     hits = repo.search_parcels(conn, q, min(limit, 25))
     return {
         "query": q,

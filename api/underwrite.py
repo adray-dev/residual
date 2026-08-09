@@ -77,7 +77,7 @@ class UnderwriteError(Exception):
 def build_assumptions(overrides: dict[str, Any] | None) -> tuple[Assumptions, dict]:
     """DEFAULT_ASSUMPTIONS with a shallow per-group merge. Returns (assumptions, applied).
 
-    Only known groups and known keys are merged — an unrecognised key is dropped rather
+    Only known groups and known keys are merged — an unrecognized key is dropped rather
     than silently widening the model's input surface. `applied` reports what actually took
     effect, so the 1c modal's "N inputs changed from default" counts reality, not intent.
     """
@@ -135,7 +135,7 @@ def underwrite(
 ) -> dict:
     """Run the full levered model for one parcel. Cached per (parcel, prototype, inputs).
 
-    Raises `UnderwriteError` with a user-facing reason when the parcel cannot be modelled —
+    Raises `UnderwriteError` with a user-facing reason when the parcel cannot be modeled —
     exempt, historic, unencoded zoning, or no admissible prototype. Those are real answers
     about a parcel, not failures, and the caller renders them as such.
     """

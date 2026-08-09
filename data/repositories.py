@@ -87,7 +87,7 @@ def resolve_rules(
 ) -> ZoningRules | None:
     """Look up rules for a zone code: EXACT match first, base district second.
 
-    Exact-first matters and is not just an optimisation. Not every slash is an overlay:
+    Exact-first matters and is not just an optimization. Not every slash is an overlay:
     Subtitle H names the Neighborhood Mixed-Use zones as base/overlay PAIRS that each carry
     their own standards (NMU-4/CP is FAR 2.0, NMU-4/WP is FAR 2.5, NMU-4/GA is 50 ft), so a
     bare `NMU-4` row would be wrong for every one of them. Encoding `NMU-4/CP` makes the
@@ -195,7 +195,7 @@ def get_parcel(conn, ssl: str) -> Parcel | None:
 
 
 def get_parcel_record(conn, ssl: str) -> dict | None:
-    """The raw parcels row including the display fields (address, neighbourhood).
+    """The raw parcels row including the display fields (address, neighborhood).
 
     The API needs both the engine's `Parcel` and the label in one round trip, so it reads
     this and calls `to_parcel(row)` rather than querying twice.
@@ -494,7 +494,17 @@ SORTABLE = {
     "land_value": "p.land_value",
     "address": "p.address",
     "parcel_id": "b.ssl",
+    # Derived, so it cannot be a plain column: the table shows cost per unit and has to be
+    # able to rank on it. NULLIF keeps a zero-unit program from dividing by zero — those
+    # rows sort last under NULLS LAST, which is where "no answer" belongs.
+    "cost_per_unit": "(b.total_development_cost / NULLIF(b.unit_count, 0))",
 }
+
+# Levered IRR is NOT here, and cannot be: it does not exist in `bake_results` (SPEC §9
+# keeps it out of the bake on purpose). Ranking by it means running the full model over
+# every matching row, so the router does that itself, bounded, rather than pretending SQL
+# could.
+IRR_SORT_KEY = "irr"
 
 _MAP_SELECT = """
     b.ssl, b.prototype_id, b.status, b.screening_rlv, b.feasibility_gap,
@@ -642,7 +652,7 @@ def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> It
     Server-side cursor: 132,632 MultiPolygons will not fit comfortably in memory.
 
     Geometry is repaired on the way out. 19 DC parcels carry self-intersecting rings, and
-    tippecanoe's behaviour on invalid input is not something to leave to chance — but the
+    tippecanoe's behavior on invalid input is not something to leave to chance — but the
     stored geometry is NOT rewritten, because the loader is the only thing that should own
     what is in the table. `was_invalid` reports how many needed it so a sudden jump is
     visible rather than silent.
@@ -890,7 +900,7 @@ def list_submarkets(conn) -> list[dict]:
 
 
 def list_neighborhoods(conn, min_parcels: int = 25) -> list[str]:
-    """Neighbourhood names for the geography filter chips.
+    """Neighborhood names for the geography filter chips.
 
     Thresholded because the assessment layer carries a long tail of near-empty names that
     would make the filter useless as a picker.
@@ -907,7 +917,7 @@ def list_neighborhoods(conn, min_parcels: int = 25) -> list[str]:
 
 
 def search_parcels(conn, q: str, limit: int = 10) -> list[dict]:
-    """Typeahead over address, parcel ID, ward and neighbourhood (the handoff's hint text).
+    """Typeahead over address, parcel ID, ward and neighborhood (the handoff's hint text).
 
     Prefix matches rank above interior matches so typing a house number behaves.
     """

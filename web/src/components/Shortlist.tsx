@@ -4,17 +4,15 @@
  * the current bake each time the list is opened, so a list cannot go stale against a
  * re-bake — the deliberate opposite of a scenario, which freezes at save.
  *
- * That design has a consequence the UI has to own: card values are SCREENING numbers, the
- * same tier the map is coloured by, so they will not match the full underwriting figure in
- * the drill-down. SPEC §11 accepts the divergence and requires it be labelled, which is
- * what the note above the grid does. The return is the exception — levered IRR does not
- * exist in the screening tier, so the server runs the full model for it.
+ * Card values are SCREENING numbers, the same tier the map is colored by, so they will not
+ * match the full underwriting figure in the drill-down. Return is the exception — levered
+ * IRR does not exist in the screening tier, so the server runs the full model for it.
  */
 import { useState } from "react";
 import type { ShortlistDetail, ShortlistSummary, ParcelRow } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { PARCEL_ID_LABEL } from "../lib/vocabulary";
-import { count, money, percent } from "../lib/format";
+import { money, percent } from "../lib/format";
 import { RAMP } from "../lib/mapStyle";
 import styles from "./Shortlist.module.css";
 
@@ -28,7 +26,7 @@ function savedAgo(iso: string | undefined): string {
 }
 
 /** A card header gradient keyed to the parcel, so cards are distinguishable at a glance
- * without the colour meaning anything — it is decoration, not an encoding. */
+ * without the color meaning anything — it is decoration, not an encoding. */
 function gradientFor(parcelId: string): string {
   let hash = 0;
   for (const ch of parcelId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -65,7 +63,7 @@ function Card({
         </div>
       </div>
 
-      {/* All three share size and weight; only colour differs. Explicit handoff correction. */}
+      {/* All three share size and weight; only color differs. Explicit handoff correction. */}
       <div className={styles.metrics}>
         <div className={styles.metric}>
           <span className="micro-label">Value</span>
@@ -126,7 +124,6 @@ export function Shortlist({
   onClose: () => void;
 }) {
   const [newName, setNewName] = useState("");
-  const totals = detail?.totals;
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Shortlists">
@@ -171,29 +168,6 @@ export function Shortlist({
             </button>
           </form>
 
-          {totals && (
-            <div className={styles.totals}>
-              <span className="micro-label">List totals</span>
-              <div className={styles.totalRow}>
-                <span>Parcels</span>
-                <span className={styles.totalValue}>{totals.parcel_count}</span>
-              </div>
-              <div className={styles.totalRow}>
-                <span>Combined value</span>
-                <span className={styles.totalValue}>{money(totals.combined_value)}</span>
-              </div>
-              <div className={styles.totalRow}>
-                <span>Combined floor area</span>
-                <span className={styles.totalValue}>
-                  {count(totals.combined_floor_area)}
-                </span>
-              </div>
-              <div className={styles.totalRow}>
-                <span>Median return</span>
-                <span className={styles.totalValue}>{percent(totals.median_return)}</span>
-              </div>
-            </div>
-          )}
         </nav>
 
         <div className={styles.main}>
@@ -217,13 +191,6 @@ export function Shortlist({
 
           {!busy && detail && detail.parcels.length > 0 && (
             <>
-              {/* The tier split, stated rather than left to be discovered by comparing a
-                  card against the drill-down it opens. */}
-              <p className={styles.tierNote}>
-                Value and yield are {vocab.tier("screening").toLowerCase()}s, read live from
-                the current bake — the same numbers the map is coloured by, and not the
-                full underwriting figures the drill-down shows. Return runs the full model.
-              </p>
               <div className={styles.grid}>
                 {detail.parcels.map((parcel) => (
                   <Card

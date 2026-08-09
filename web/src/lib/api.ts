@@ -100,7 +100,7 @@ export function getParcel(parcelId: string, signal?: AbortSignal): Promise<Parce
   return request<ParcelRecord>(parcelPath(parcelId), { signal });
 }
 
-/** Typeahead over address, parcel ID, ward and neighbourhood. */
+/** Typeahead over address, parcel ID, ward and neighborhood. */
 export async function searchParcels(q: string, signal?: AbortSignal): Promise<SearchResult[]> {
   const response = await request<{ results: SearchResult[] }>(
     `/parcels/search?q=${encodeURIComponent(q)}&limit=8`,

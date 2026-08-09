@@ -1,13 +1,12 @@
-/** The 1b Program card: what actually gets built, and the demolition toggle.
+/** The 1b Program card: what actually gets built.
  *
- * Every figure here is reporting-only. In particular `unit_count` is labelled "Units
- * (est.)" because SPEC is explicit that revenue is `net_rentable_sf × rent_psf` and unit
- * count is never wired into it — the estimate is there to make the program legible, not
- * because the model priced it.
+ * Every figure here is reporting-only. `unit_count` in particular never enters revenue —
+ * SPEC is explicit that revenue is `net_rentable_sf × rent_psf` — so the count is here to
+ * make the program legible, not because the model priced it.
  *
- * The demolition toggle is the one control on this card that changes the numbers. It is
- * off by default and is never applied in the bake, so flipping it re-runs the full model
- * and every figure in the panel moves with it.
+ * Demolition used to live here as a toggle. It moved into the existing-building flag,
+ * because a standing building is the reason the question exists at all, and the warning
+ * and the control belong in one place rather than two.
  */
 import type { ProgramOut } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
@@ -17,11 +16,6 @@ import styles from "./ProgramCard.module.css";
 export interface ProgramCardProps {
   program: ProgramOut;
   vocab: Vocabulary;
-  /** Existing structure on the parcel, in SF. Zero means nothing to demolish. */
-  existingBuildingSf: number;
-  demolition: boolean;
-  busy: boolean;
-  onDemolitionChange: (next: boolean) => void;
   onTryAnotherPrototype?: () => void;
 }
 
@@ -36,17 +30,7 @@ function Cell({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ProgramCard({
-  program,
-  vocab,
-  existingBuildingSf,
-  demolition,
-  busy,
-  onDemolitionChange,
-  onTryAnotherPrototype,
-}: ProgramCardProps) {
-  const nothingToDemolish = existingBuildingSf <= 0;
-
+export function ProgramCard({ program, vocab, onTryAnotherPrototype }: ProgramCardProps) {
   return (
     <div className={styles.card}>
       <div className={styles.head}>
@@ -64,7 +48,7 @@ export function ProgramCard({
       <div className={styles.grid}>
         <Cell label={vocab.metric("gross_sf")} value={count(program.gross_sf)} />
         <Cell label={vocab.metric("net_rentable_sf")} value={count(program.net_rentable_sf)} />
-        <Cell label="Units (est.)" value={count(program.unit_count)} />
+        <Cell label="Units" value={count(program.unit_count)} />
         <Cell label="Floors" value={String(program.floors)} />
         {/* Pre-phrased server-side: "256 stalls, surface", never "256 podium". */}
         <Cell label="Parking" value={program.parking_phrase} />
@@ -74,28 +58,6 @@ export function ProgramCard({
         />
         <Cell label="Build type" value={vocab.construction(program.construction_type)} />
         <Cell label="Rent" value={`${rate(program.rent_psf_monthly)}/SF/mo`} />
-      </div>
-
-      <div className={styles.toggleRow}>
-        <div className={styles.toggleText}>
-          <div className={styles.toggleLabel}>Include demolition</div>
-          <div className={styles.toggleHint}>
-            {nothingToDemolish
-              ? "Nothing standing on this parcel to demolish."
-              : `${count(existingBuildingSf)} SF standing. Adds demolition cost and re-runs the model.`}
-          </div>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={demolition}
-          aria-label="Include demolition"
-          disabled={busy || nothingToDemolish}
-          className={`${styles.switch} ${demolition ? styles.on : ""}`}
-          onClick={() => onDemolitionChange(!demolition)}
-        >
-          <span className={styles.knob} />
-        </button>
       </div>
     </div>
   );

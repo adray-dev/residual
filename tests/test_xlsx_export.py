@@ -67,7 +67,7 @@ def _computed(xlsx_bytes: bytes, tmp_path) -> dict:
     return out
 
 
-def _labelled(xlsx_bytes: bytes) -> dict[str, str]:
+def _labeled(xlsx_bytes: bytes) -> dict[str, str]:
     """Map each Summary label to the address of its value cell, so the test reads by NAME.
 
     Pinning cell addresses in the test would make it a change-detector for layout; what is
@@ -99,7 +99,7 @@ def _engine(client, parcel_id: str, **body) -> dict:
 
 def _assert_matches(xlsx: bytes, engine: dict, tmp_path):
     cells = _computed(xlsx, tmp_path)
-    where = _labelled(xlsx)
+    where = _labeled(xlsx)
 
     def sheet(label: str) -> float:
         address = where[label]
@@ -203,7 +203,7 @@ def test_export_is_named_after_the_address_not_the_parcel_id(client, parcels):
     assert "ssl" not in disposition.lower()
 
 
-def test_an_unmodellable_parcel_is_refused_rather_than_exported(client):
+def test_an_unmodelable_parcel_is_refused_rather_than_exported(client):
     rows = client.get("/map/query", params={"statuses": ["exempt"], "limit": 1}).json()["rows"]
     response = client.post("/export.xlsx", json={"parcel_id": rows[0]["parcel_id"]})
     assert response.status_code == 422

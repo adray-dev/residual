@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { getMapQuery, NotModellable } from "../lib/api";
-import { money } from "../lib/format";
+import { money, percent } from "../lib/format";
 import { EMPTY_FILTERS, isEmpty, queryParams, toggle, type FilterState } from "../lib/filters";
 import styles from "./Filters.module.css";
 
@@ -114,12 +114,12 @@ export function Filters({
             value={state.rlvMin ?? floor}
             aria-label="Minimum feasibility value"
             onChange={(event) => {
-              const value = Number(event.target.value);
-              set({
-                rlvMin: value <= floor ? null : value,
-                // Keep the handles from crossing, which would match nothing and look broken.
-                rlvMax: state.rlvMax != null && value > state.rlvMax ? value : state.rlvMax,
-              });
+              // Clamp against the other handle instead of pushing it. Pushing is what made
+              // the two sliders appear to move together; each one now simply stops when it
+              // reaches the other, and never rewrites the value the user did not touch.
+              const ceilingForMin = state.rlvMax ?? ceiling;
+              const value = Math.min(Number(event.target.value), ceilingForMin);
+              set({ rlvMin: value <= floor ? null : value });
             }}
           />
           <input
@@ -131,19 +131,36 @@ export function Filters({
             value={state.rlvMax ?? ceiling}
             aria-label="Maximum feasibility value"
             onChange={(event) => {
-              const value = Number(event.target.value);
-              set({
-                rlvMax: value >= ceiling ? null : value,
-                rlvMin: state.rlvMin != null && value < state.rlvMin ? value : state.rlvMin,
-              });
+              const floorForMax = state.rlvMin ?? floor;
+              const value = Math.max(Number(event.target.value), floorForMax);
+              set({ rlvMax: value >= ceiling ? null : value });
             }}
           />
+        </div>
+
+        <div className={styles.group}>
+          <div className={`micro-label ${styles.groupLabel}`}>Desired IRR</div>
+          <div className={styles.readout}>
+            {state.irrMin == null ? "Any" : `${percent(state.irrMin, 1)} or better`}
+          </div>
+          <input
+            className={styles.slider}
+            type="range"
+            min={0}
+            max={0.5}
+            step={0.005}
+            value={state.irrMin ?? 0}
+            aria-label="Minimum IRR"
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              set({ irrMin: value <= 0 ? null : value });
+            }}
+          />
+          {/* IRR is not in the bake, so filtering on it runs the full model per matching
+              parcel. The server refuses above its bound with an actionable sentence, which
+              lands in `note` below rather than silently returning nothing. */}
           <div className={styles.hint}>
-            {ramp
-              ? `${ramp.negative_count.toLocaleString()} of ${(
-                  ramp.negative_count + ramp.positive_count
-                ).toLocaleString()} scored parcels price below $0.`
-              : ""}
+            Runs the full model on every match — narrow by ward first on large sets.
           </div>
         </div>
 
