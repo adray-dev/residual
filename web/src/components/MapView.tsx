@@ -17,10 +17,10 @@ import maplibregl, {
 } from "maplibre-gl";
 import { PMTiles, Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { PARCEL_BORDER, valueRamp } from "../lib/mapStyle";
+import { PARCEL_BORDER, STATUS_COLORS, hatchImage, valueRamp } from "../lib/mapStyle";
 
-/** Only scored parcels are rendered — see the layer block below. */
 const SCORED: FilterSpecification = ["==", ["get", "status"], "scored"];
+const HATCH = "exempt-hatch";
 
 const SOURCE = "parcels";
 const LAYER = "parcels"; // the tippecanoe layer name, from tiles/build_tiles.py
@@ -110,10 +110,57 @@ export function MapView({
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-left");
 
     instance.on("load", () => {
-      // ONLY scored parcels are drawn. The product visualises feasibility, so a parcel the
-      // engine could not price has nothing to show on the ramp — it is absent rather than
-      // given a shade of its own. The bake still scores every parcel and the tiles still
-      // carry all 132,604; this is a display decision, not a data one.
+      instance.addImage(HATCH, hatchImage(), { pixelRatio: 2 });
+
+      // Land the model cannot price is drawn first and in neutrals, so it reads as the
+      // ground the priced parcels sit on rather than competing with the value ramp.
+      instance.addLayer({
+        id: "parcels-exempt",
+        type: "fill",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["==", ["get", "status"], "exempt"],
+        paint: { "fill-pattern": HATCH },
+      });
+      instance.addLayer({
+        id: "parcels-infeasible",
+        type: "fill",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["==", ["get", "status"], "infeasible"],
+        paint: { "fill-color": STATUS_COLORS.infeasible },
+      });
+      instance.addLayer({
+        id: "parcels-historic",
+        type: "fill",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["==", ["get", "status"], "historic"],
+        paint: { "fill-color": STATUS_COLORS.historic },
+      });
+      instance.addLayer({
+        id: "parcels-not-covered",
+        type: "fill",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["==", ["get", "status"], "zone_not_encoded"],
+        paint: { "fill-color": STATUS_COLORS.zone_not_encoded },
+      });
+      // Zoning we have not encoded yet gets a dashed edge: visibly provisional, rather
+      // than a solid shape that implies we looked and found nothing.
+      instance.addLayer({
+        id: "parcels-not-covered-edge",
+        type: "line",
+        source: SOURCE,
+        "source-layer": LAYER,
+        filter: ["==", ["get", "status"], "zone_not_encoded"],
+        paint: {
+          "line-color": STATUS_COLORS.zone_not_encoded_border,
+          "line-width": 1.5,
+          "line-dasharray": [2, 2],
+        },
+      });
+
       instance.addLayer({
         id: "parcels-value",
         type: "fill",
@@ -130,7 +177,6 @@ export function MapView({
         type: "line",
         source: SOURCE,
         "source-layer": LAYER,
-        filter: SCORED,
         paint: {
           "line-color": PARCEL_BORDER,
           "line-width": 1,
@@ -157,7 +203,6 @@ export function MapView({
         type: "fill",
         source: SOURCE,
         "source-layer": LAYER,
-        filter: SCORED,
         paint: {
           "fill-color": "#ffffff",
           "fill-opacity": [
@@ -181,7 +226,6 @@ export function MapView({
           type: "line",
           source: SOURCE,
           "source-layer": LAYER,
-          filter: SCORED,
           paint: {
             "line-color": color,
             "line-width": width,
@@ -213,8 +257,8 @@ export function MapView({
         });
     });
 
-    // One pickable layer now, because one layer is all that is drawn.
-    const pickable = ["parcels-value"];
+    const pickable = ["parcels-value", "parcels-infeasible", "parcels-historic",
+                      "parcels-exempt", "parcels-not-covered"];
 
     const featureId = (feature: MapGeoJSONFeature) =>
       feature.id != null ? String(feature.id) : null;
@@ -276,9 +320,7 @@ export function MapView({
       if (!instance.getLayer("parcels-dim")) return;
       instance.setFilter(
         "parcels-dim",
-        filter
-          ? (["all", SCORED, ["!", filter]] as FilterSpecification)
-          : (["literal", false] as FilterSpecification),
+        filter ? (["!", filter] as FilterSpecification) : (["literal", false] as FilterSpecification),
       );
     };
     if (instance.isStyleLoaded()) apply();

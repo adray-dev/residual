@@ -404,10 +404,8 @@ export function App() {
         </button>
         {meta && (
           <span className={styles.batch}>
-            {/* The count names what the map shows, not what the bake holds — quoting
-                132,632 beside a map drawing 79,073 of them invites the wrong reading. */}
-            {(meta.status_counts["scored"] ?? meta.parcel_count).toLocaleString()} scored
-            parcels · baked {new Date(meta.computed_at).toLocaleDateString()}
+            {meta.parcel_count.toLocaleString()} parcels · baked{" "}
+            {new Date(meta.computed_at).toLocaleDateString()}
           </span>
         )}
       </header>

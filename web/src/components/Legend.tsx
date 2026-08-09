@@ -1,14 +1,14 @@
 /** The map legend: what the colours mean, and the control that switches objective.
  *
- * SPEC §9's rule is that every colour on the map is explainable. The map now draws ONLY
- * scored parcels, so there is exactly one colour system to explain — the value ramp — and
- * the status swatches went with the statuses. What replaced them is a count of what is not
- * shown, because a large silent absence reads as missing data rather than as a decision.
+ * SPEC §9's rule is that every colour on the map is explainable, so this lists both systems
+ * the map uses: the diverging value ramp, and the neutrals for land the model cannot price.
+ * A legend showing only the ramp would leave 40% of DC's parcels coloured by nothing the
+ * reader can look up.
  */
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { money, rate } from "../lib/format";
-import { LEGEND_GRADIENT, OBJECTIVE_METRIC } from "../lib/mapStyle";
+import { LEGEND_GRADIENT, OBJECTIVE_METRIC, STATUS_COLORS } from "../lib/mapStyle";
 import styles from "./Legend.module.css";
 
 /** Chrome copy for the segmented control, which cannot hold the full metric names
@@ -46,13 +46,15 @@ export function Legend({
   const positive = ramp?.positive_count ?? 0;
   const scored = negative + positive;
 
-  // The status swatches are gone with the statuses themselves: the map draws only scored
-  // parcels, so there is no shade left to explain. What replaces them is a plain statement
-  // of what is NOT on the map, because 53,559 parcels quietly missing would otherwise read
-  // as a gap in the data rather than a deliberate exclusion.
-  const excluded = Object.entries(meta.status_counts)
-    .filter(([status]) => status !== "scored")
-    .reduce((n, [, value]) => n + value, 0);
+  // SPEC §9: every colour on the map is explainable, so every status the bake can emit is
+  // listed with its count. Order runs lightest to darkest, which is also roughly least to
+  // most restricted.
+  const statuses: [keyof typeof STATUS_COLORS, string][] = [
+    ["zone_not_encoded", "zone_not_encoded"],
+    ["exempt", "exempt"],
+    ["infeasible", "infeasible"],
+    ["historic", "historic"],
+  ];
 
   return (
     <div className={styles.panel}>
@@ -81,7 +83,7 @@ export function Legend({
       {/* Where the ramp crosses zero, stated rather than left to be inferred from a hue. */}
       {scored > 0 && (
         <div className={styles.zero}>
-          The ramp turns teal at $0.{" "}
+          Magenta below $0, green above.{" "}
           <strong>{Math.round((negative / scored) * 100)}%</strong> of scored parcels price
           below it.
         </div>
@@ -89,11 +91,35 @@ export function Legend({
 
       <div className={styles.rule} />
 
-      <div className={styles.excluded}>
-        Showing the <strong>{scored.toLocaleString()}</strong> parcels the model could
-        price. {excluded.toLocaleString()} more are not shown — public or tax-exempt land,
-        historic districts, and zoning not yet encoded.
-      </div>
+      {/* Land the model cannot price. Neutral on the map and neutral here — these are
+          context for the value ramp, not competitors with it. */}
+      <div className={`micro-label ${styles.notPriced}`}>Not priced</div>
+      {statuses.map(([colorKey, statusKey]) => {
+        const count = meta.status_counts[statusKey];
+        if (!count) return null;
+        return (
+          <div className={styles.status} key={statusKey}>
+            <span
+              className={styles.swatch}
+              style={
+                statusKey === "exempt"
+                  ? {
+                      backgroundImage: `repeating-linear-gradient(45deg,${STATUS_COLORS.exempt} 0 3px,${STATUS_COLORS.exempt_alt} 3px 6px)`,
+                    }
+                  : statusKey === "zone_not_encoded"
+                    ? {
+                        background: STATUS_COLORS.zone_not_encoded,
+                        borderStyle: "dashed",
+                        borderColor: STATUS_COLORS.zone_not_encoded_border,
+                      }
+                    : { background: STATUS_COLORS[colorKey] }
+              }
+            />
+            {vocab.status(statusKey)}
+            <span className={styles.count}>{count.toLocaleString()}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

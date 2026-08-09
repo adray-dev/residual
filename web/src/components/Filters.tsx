@@ -170,8 +170,11 @@ export function Filters({
       {note && <div className={styles.note}>{note}</div>}
 
       <div className={styles.foot}>
+        {/* "Priced", because the filters below only exist for scored parcels — value and
+            best build are meaningless on land the model could not price, and quoting a
+            bare count beside a map drawing all 132,632 would read as a contradiction. */}
         <span className={`${styles.count} ${stale ? styles.countStale : ""}`}>
-          <b>{(matched ?? meta.parcel_count).toLocaleString()}</b> parcels match
+          <b>{(matched ?? 0).toLocaleString()}</b> priced parcels match
         </span>
       </div>
     </div>

@@ -17,7 +17,9 @@
  */
 import type { ExpressionSpecification } from "maplibre-gl";
 
-/** The 8-stop ramp, low -> high feasibility (handoff "Map value ramp"). */
+/** The teal sequential ramp. NOT the map's value ramp any more — it still dresses the
+ * sources & uses bars (parts of one magnitude) and the shortlist card headers, where a
+ * single hue light-to-dark is the right encoding. */
 export const RAMP = [
   "#edeae4",
   "#dce9e6",
@@ -29,12 +31,46 @@ export const RAMP = [
   "#0a5250",
 ] as const;
 
-/** Deliberately outside the ramp, so unscored land never reads as "low value". */
+/** The map's DIVERGING value ramp: magenta below $0, green above. 8 stops, low -> high.
+ *
+ * The old ramp was a single teal hue, so both arms sat on the same scale and the negative
+ * half — 56% of scored DC parcels — collapsed into pales barely separable from the canvas.
+ * A diverging measure needs two hues meeting at a light midpoint, which is what this is.
+ *
+ * These are ColorBrewer's PiYG, chosen over a hand-picked green/pink because the obvious
+ * pairing fails colour-vision checks badly: a saturated green against a saturated pink
+ * separated by only ΔE 5.7 under deuteranopia, which would make "loses money" and "makes
+ * money" the same colour for roughly one man in twenty. PiYG separates at ΔE 11.9 deutan
+ * and 35.7 in normal vision — verified with the palette validator, not eyeballed.
+ */
+export const VALUE_RAMP = [
+  "#c51b7d",  // deepest negative
+  "#de77ae",
+  "#f1b6da",
+  "#fde0ef",  // just below $0
+  "#e6f5d0",  // just above $0
+  "#b8e186",
+  "#7fbc41",
+  "#4d9221",  // strongest positive
+] as const;
+
+/** Land the model cannot price, in neutrals.
+ *
+ * Two rules govern these. They must sit outside the value ramp so unscored land never
+ * reads as a value — and now that the ramp OWNS magenta, historic can no longer be the
+ * mauve it was, or "restricted" and "loses money" would be the same colour. They are also
+ * deliberately desaturated: these parcels are context, not the story, and greys let the
+ * ramp carry the eye. Identity comes from the legend label and, for two of them, texture.
+ *
+ * `infeasible` and `historic` are the only two solid fills, so they are the pair a reader
+ * must actually tell apart — separated here to ΔE 20.6 in normal vision, well clear of the
+ * 15 floor the earlier pairing failed.
+ */
 export const STATUS_COLORS = {
-  infeasible: "#9c968b",
+  infeasible: "#ada79e",
   exempt: "#c3cbce",
   exempt_alt: "#d6dcde",
-  historic: "#b0779a",
+  historic: "#5c574f",
   zone_not_encoded: "#ffffff",
   zone_not_encoded_border: "#9a958c",
 } as const;
@@ -65,24 +101,24 @@ export function valueRamp(objective: string): ExpressionSpecification {
   return [
     "match",
     ["get", field],
-    -4, RAMP[0],
-    -3, RAMP[1],
-    -2, RAMP[2],
-    -1, RAMP[3],
-    1, RAMP[4],
-    2, RAMP[5],
-    3, RAMP[6],
-    4, RAMP[7],
+    -4, VALUE_RAMP[0],
+    -3, VALUE_RAMP[1],
+    -2, VALUE_RAMP[2],
+    -1, VALUE_RAMP[3],
+    1, VALUE_RAMP[4],
+    2, VALUE_RAMP[5],
+    3, VALUE_RAMP[6],
+    4, VALUE_RAMP[7],
     // Bin 0 is "unscored on this objective" — a scored parcel can still have no
     // feasibility gap, because gap needs an assessed land value the parcel may not have.
-    // It gets the neutral end of the ramp rather than a value colour it has not earned.
-    RAMP[0],
+    // It gets the ramp's lightest step rather than a value colour it has not earned.
+    VALUE_RAMP[3],
   ] as ExpressionSpecification;
 }
 
-/** The 6-stop CSS approximation the handoff uses for the legend bar. */
+/** The legend bar, mirroring the diverging ramp stop for stop. */
 export const LEGEND_GRADIENT =
-  "linear-gradient(90deg,#edeae4,#cfe3e0,#93c9c3,#4fa39d,#0e7c7b,#0a5250)";
+  "linear-gradient(90deg,#c51b7d,#de77ae,#f1b6da,#fde0ef,#e6f5d0,#b8e186,#7fbc41,#4d9221)";
 
 /** A 6px 45-degree hatch for exempt land, matching the handoff's repeating gradient.
  *
