@@ -291,7 +291,7 @@ def test_unencoded_zoning_is_an_answer_not_an_error(client):
     # Says the district is not covered and the parcel is not assessed. It deliberately does
     # NOT say "exempt": these are ordinary districts (D-6, CG-4, ARTS-2) whose rules we have
     # not encoded, not land that cannot be developed.
-    assert body["status_label"] == "Zoning not yet covered — not assessed"
+    assert body["status_label"] == "Zoning assessment pending"
 
 
 def test_missing_parcel_is_404(client):

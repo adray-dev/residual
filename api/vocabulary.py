@@ -123,7 +123,7 @@ STATUS_LABELS: dict[str, str] = {
     # D-6, CG-4, ARTS-2, NMU-7B/GA, some of the most developable land downtown. Calling
     # them exempt would state something false about the parcel; what is missing is our
     # coverage, not their development rights.
-    "zone_not_encoded": "Zoning not yet covered — not assessed",
+    "zone_not_encoded": "Zoning assessment pending",
 }
 
 # --- assumption inputs (the 1c modal) ---------------------------------------

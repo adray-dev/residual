@@ -95,9 +95,40 @@ export const OBJECTIVE_METRIC: Record<string, string> = {
   gap: "feasibility_gap",
 };
 
-/** Fill color for scored parcels: a match on the pre-baked bin, nothing computed. */
-export function valueRamp(objective: string): ExpressionSpecification {
-  const field = BIN_FIELD[objective] ?? "bin";
+/** Where the ramp collapses. Below this the map answers "does this pencil?"; above it the
+ * quantile detail comes back. */
+export const COARSE_ZOOM = 12;
+
+/** The three-bin city-scale ramp: below zero, near zero, above zero.
+ *
+ * At z10 a parcel is a few pixels, so eight quantile steps next to each other are not
+ * detail — they are noise, and the diverging hues make the noise louder by putting
+ * saturated magenta beside saturated green. Three bands is what the eye can actually
+ * resolve at that size, and it happens to be the only question worth asking of a whole
+ * city at once. The two hues are stops from the validated ramp; the middle is a light
+ * neutral so the near-zero band recedes into the canvas rather than competing.
+ */
+const COARSE_NEGATIVE = "#de77ae";
+const COARSE_NEUTRAL = "#ece9e4";
+const COARSE_POSITIVE = "#7fbc41";
+
+function coarseRamp(field: string): ExpressionSpecification {
+  return [
+    "match",
+    ["get", field],
+    -4, COARSE_NEGATIVE,
+    -3, COARSE_NEGATIVE,
+    -2, COARSE_NEGATIVE,
+    -1, COARSE_NEUTRAL,
+    1, COARSE_NEUTRAL,
+    2, COARSE_POSITIVE,
+    3, COARSE_POSITIVE,
+    4, COARSE_POSITIVE,
+    COARSE_NEUTRAL,
+  ] as ExpressionSpecification;
+}
+
+function fineRamp(field: string): ExpressionSpecification {
   return [
     "match",
     ["get", field],
@@ -115,6 +146,34 @@ export function valueRamp(objective: string): ExpressionSpecification {
     VALUE_RAMP[3],
   ] as ExpressionSpecification;
 }
+
+/** Fill color for scored parcels: a match on the pre-baked bin, switching to the coarse
+ * three-band ramp below `COARSE_ZOOM`. `step` on zoom sits at the top level, which is the
+ * only place MapLibre allows a zoom expression. */
+export function valueRamp(objective: string): ExpressionSpecification {
+  const field = BIN_FIELD[objective] ?? "bin";
+  return [
+    "step",
+    ["zoom"],
+    coarseRamp(field),
+    COARSE_ZOOM,
+    fineRamp(field),
+  ] as ExpressionSpecification;
+}
+
+/** Fills lighten as you zoom out.
+ *
+ * At city scale every parcel is a few pixels, and full-strength fills across 132,604 of
+ * them read as static. Dropping the opacity turns the map into a wash that still shows
+ * where the value is without asking the eye to resolve individual lots it cannot see.
+ */
+export const FILL_OPACITY: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  9, 0.5,
+  13, 1,
+] as ExpressionSpecification;
 
 /** The legend bar, mirroring the diverging ramp stop for stop. */
 export const LEGEND_GRADIENT =

@@ -17,7 +17,13 @@ import maplibregl, {
 } from "maplibre-gl";
 import { PMTiles, Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { PARCEL_BORDER, STATUS_COLORS, hatchImage, valueRamp } from "../lib/mapStyle";
+import {
+  FILL_OPACITY,
+  PARCEL_BORDER,
+  STATUS_COLORS,
+  hatchImage,
+  valueRamp,
+} from "../lib/mapStyle";
 
 const SCORED: FilterSpecification = ["==", ["get", "status"], "scored"];
 const HATCH = "exempt-hatch";
@@ -120,7 +126,7 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: ["==", ["get", "status"], "exempt"],
-        paint: { "fill-pattern": HATCH },
+        paint: { "fill-pattern": HATCH, "fill-opacity": FILL_OPACITY },
       });
       instance.addLayer({
         id: "parcels-infeasible",
@@ -128,7 +134,7 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: ["==", ["get", "status"], "infeasible"],
-        paint: { "fill-color": STATUS_COLORS.infeasible },
+        paint: { "fill-color": STATUS_COLORS.infeasible, "fill-opacity": FILL_OPACITY },
       });
       instance.addLayer({
         id: "parcels-historic",
@@ -136,7 +142,7 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: ["==", ["get", "status"], "historic"],
-        paint: { "fill-color": STATUS_COLORS.historic },
+        paint: { "fill-color": STATUS_COLORS.historic, "fill-opacity": FILL_OPACITY },
       });
       instance.addLayer({
         id: "parcels-not-covered",
@@ -144,7 +150,7 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: ["==", ["get", "status"], "zone_not_encoded"],
-        paint: { "fill-color": STATUS_COLORS.zone_not_encoded },
+        paint: { "fill-color": STATUS_COLORS.zone_not_encoded, "fill-opacity": FILL_OPACITY },
       });
       // Zoning we have not encoded yet gets a dashed edge: visibly provisional, rather
       // than a solid shape that implies we looked and found nothing.
@@ -167,7 +173,7 @@ export function MapView({
         source: SOURCE,
         "source-layer": LAYER,
         filter: SCORED,
-        paint: { "fill-color": valueRamp(objective) },
+        paint: { "fill-color": valueRamp(objective), "fill-opacity": FILL_OPACITY },
       });
 
       // The white hairline between lots. Fades out when zoomed far enough that every lot
