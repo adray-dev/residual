@@ -1,10 +1,15 @@
-/* Anchored over the selected parcel and pulled up above it, per the handoff:
-   width 300, translate(-50%,-100%), clamped so it never leaves the viewport. */
+/* Anchored near the selected parcel, at coordinates the component measures — see the
+   layout effect in Popup.tsx. No transform: the left/top ARE the final corner, which is
+   what makes clamping to the map area exact. */
 .popup {
   position: absolute;
-  width: 300px;
-  transform: translate(-50%, -100%);
-  margin-top: -12px;
+  /* Never wider than the map area it sits in — at a narrow window, or with the drill-down
+     rail open, a fixed 300px would hang off the right edge no matter where it is placed. */
+  width: min(300px, calc(100% - 24px));
+  /* Never taller than the map area; a long list picker scrolls inside instead. */
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border-radius: var(--r-panel);
   box-shadow: var(--sh-popup);
@@ -180,6 +185,7 @@
   max-height: 168px;
   overflow-y: auto;
   padding: 4px 0;
+  flex-shrink: 0;
 }
 
 .pickerRow {

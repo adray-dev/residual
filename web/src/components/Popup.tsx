@@ -10,11 +10,12 @@
  * that divergence and requires it be labelled rather than reconciled away, which is what
  * the "Screening estimate" caption does.
  */
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ParcelRecord } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { PARCEL_ID_LABEL } from "../lib/vocabulary";
 import { count, money } from "../lib/format";
+import { placePopup } from "../lib/popupPlacement";
 import styles from "./Popup.module.css";
 
 export interface PopupProps {
@@ -62,17 +63,65 @@ export function Popup({
   onClose,
 }: PopupProps) {
   const [saving, setSaving] = useState(false);
-  // Clamped so a parcel near an edge does not push the card off screen. The right edge
-  // also has to clear the drill-down rail when it is open, which is why the clamp reads
-  // the live window rather than the handoff's fixed 340-1180 range.
-  const half = 150;
-  const x = Math.min(Math.max(at.x, half + 12), window.innerWidth - half - 12);
+  const card = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ x: number; y: number } | null>(null);
+
+  // Position is MEASURED, not estimated.
+  //
+  // The card used to sit at `translate(-50%, -100%)` above the click with only a horizontal
+  // clamp, against `window.innerWidth`. Three ways that put it off screen: a parcel near
+  // the top of the map pushed the whole card above the viewport, because nothing clamped
+  // vertically at all; the card's height changes with its content (loading, scored, not
+  // scored, list picker open) so no fixed offset could be right; and the window is the
+  // wrong frame — the popup lives in the map area, which loses 620px the moment the
+  // drill-down rail opens beside it.
+  //
+  // So: measure the card and its container, clamp both axes inside the container, and flip
+  // BELOW the parcel when there is no room above.
+  useLayoutEffect(() => {
+    const element = card.current;
+    if (!element) return;
+
+    const place = () => {
+      const parent = element.offsetParent as HTMLElement | null;
+      setBox(
+        placePopup(
+          at,
+          { width: element.offsetWidth, height: element.offsetHeight },
+          {
+            width: parent?.clientWidth ?? window.innerWidth,
+            height: parent?.clientHeight ?? window.innerHeight,
+          },
+        ),
+      );
+    };
+
+    place();
+
+    // The card resizes when its content arrives or the picker opens, and the CONTAINER
+    // resizes when the drill-down rail opens beside it. Both move where the card belongs.
+    const observer = new ResizeObserver(place);
+    observer.observe(element);
+    const parent = element.offsetParent;
+    if (parent instanceof HTMLElement) observer.observe(parent);
+    return () => observer.disconnect();
+  }, [at.x, at.y]);
 
   const best = record?.prototypes.find((p) => p.is_best) ?? record?.prototypes[0] ?? null;
   const scored = record?.status === "scored" && best != null;
 
   return (
-    <div className={styles.popup} style={{ left: x, top: at.y }}>
+    <div
+      className={styles.popup}
+      ref={card}
+      style={{
+        left: box?.x ?? 0,
+        top: box?.y ?? 0,
+        // Hidden for the one layout pass before the measurement lands, so the card is
+        // never briefly painted in the wrong place.
+        visibility: box ? "visible" : "hidden",
+      }}
+    >
       <div className={styles.head}>
         <div className={styles.title}>
           <div className={styles.address}>{record?.display_name ?? "Loading…"}</div>
