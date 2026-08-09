@@ -32,6 +32,8 @@ import { Filters } from "./components/Filters";
 import { Legend } from "./components/Legend";
 import { MapView } from "./components/MapView";
 import { Popup } from "./components/Popup";
+import { Compare, CompareTray } from "./components/Compare";
+import { MAX_COMPARE, toggleCompare } from "./lib/compare";
 import styles from "./App.module.css";
 
 type PanelState =
@@ -67,6 +69,12 @@ export function App() {
   // that no longer describes what is on screen.
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [exporting, setExporting] = useState(false);
+  // Compare holds parcel IDS, not results: each column is a full-tier underwrite, and
+  // running three of them on every selection change would be wasteful. They resolve when
+  // the view opens.
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareRows, setCompareRows] = useState<Underwrite[] | null>(null);
+  const [comparing, setComparing] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -151,10 +159,25 @@ export function App() {
    * is why the endpoint is a cacheable GET — so a panel is genuinely linkable, and sharing
    * "look at this one" does not mean "open the map and hunt for it". */
   useEffect(() => {
-    const parcelId = new URLSearchParams(window.location.search).get("parcel");
+    const params = new URLSearchParams(window.location.search);
+    const parcelId = params.get("parcel");
     if (parcelId) {
       setSelectedFromLink(parcelId);
       underwrite(parcelId);
+    }
+    // `?compare=a,b,c` opens the comparison directly, for the same reason `?parcel=` opens
+    // the panel: "look at these three side by side" is a thing people send each other.
+    const compare = params.get("compare");
+    if (compare) {
+      const ids = compare.split(",").map((id) => id.trim()).filter(Boolean).slice(0, MAX_COMPARE);
+      if (ids.length) {
+        setCompareIds(ids);
+        setComparing(true);
+        Promise.all(ids.map((id) => getUnderwrite(id)))
+          .then(setCompareRows)
+          .catch(() => undefined)
+          .finally(() => setComparing(false));
+      }
     }
   }, [underwrite]);
 
@@ -252,6 +275,16 @@ export function App() {
 
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
+  /** Resolve the compare set. Each column is its own full model run (SPEC §9 keeps levered
+   * IRR out of the bake), so this is the one place the app fires several at once. */
+  const openCompare = useCallback(() => {
+    setComparing(true);
+    Promise.all(compareIds.map((id) => getUnderwrite(id)))
+      .then((rows) => setCompareRows(rows))
+      .catch((error: unknown) => setPanel(failed(error, false)))
+      .finally(() => setComparing(false));
+  }, [compareIds, failed]);
+
   const filter = useMemo(() => mapFilter(filters), [filters]);
   const vocab = useMemo(() => (meta ? new Vocabulary(meta.labels) : null), [meta]);
 
@@ -323,10 +356,22 @@ export function App() {
               record={selection.record}
               vocab={vocab}
               busy={panel.kind === "loading"}
+              inCompare={compareIds.includes(selection.parcelId)}
+              canCompare={compareIds.length < MAX_COMPARE}
               onOpenFull={openFull}
+              onToggleCompare={() =>
+                setCompareIds((ids) => toggleCompare(ids, selection.parcelId))
+              }
               onClose={dismiss}
             />
           )}
+
+          <CompareTray
+            ids={compareIds}
+            busy={comparing}
+            onOpen={openCompare}
+            onClear={() => setCompareIds([])}
+          />
         </div>
 
         {panel.kind === "ready" && vocab && (
@@ -370,6 +415,10 @@ export function App() {
           <div className={`${styles.panelState} ${styles.error}`}>{panel.message}</div>
         )}
       </main>
+
+      {compareRows && vocab && (
+        <Compare rows={compareRows} vocab={vocab} onClose={() => setCompareRows(null)} />
+      )}
 
       {modalOpen && defaults && meta && vocab && panel.kind !== "loading" && (
         <InputsModal

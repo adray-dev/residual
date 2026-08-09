@@ -1,0 +1,225 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--canvas-deep);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+.bar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.count {
+  font-size: 12.5px;
+  color: var(--ink-40);
+}
+
+.close {
+  margin-left: auto;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--r-button);
+}
+
+.close:hover {
+  background: var(--canvas);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+}
+
+.grid {
+  display: grid;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+  min-width: 760px;
+}
+
+/* --- column headers ------------------------------------------------------- */
+.head {
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.headLabel {
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.swatch {
+  height: 76px;
+}
+
+.headBody {
+  padding: 12px 14px 0;
+}
+
+.address {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.identity {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-40);
+  margin-top: 3px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+  min-height: 22px;
+}
+
+.tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+/* --- rows ----------------------------------------------------------------- */
+.rowLabel {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 44px;
+  background: var(--surface-alt);
+  font-size: 12.5px;
+  color: var(--ink-60);
+  border-top: 1px solid var(--hairline);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+  height: 44px;
+  border-top: 1px solid var(--hairline);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.zebra {
+  background: var(--surface-alt);
+}
+
+.cellValue {
+  font-weight: 400;
+}
+
+/* A highlighted row is one of the three figures a developer actually decides on. It gets a
+   wash, larger type, and the COLUMN's colour — which is why the colour is positional: the
+   emphasis says "this metric matters", never "this column won". */
+.highlight {
+  background: #f6faf9;
+}
+
+.highlight .cellValue {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rowLabel.highlight {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.text {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink-60);
+}
+
+.empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--ink-40);
+  font-size: 13px;
+}
+
+/* --- the tray ------------------------------------------------------------- */
+.tray {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--r-pill);
+  padding: 8px 10px 8px 16px;
+  box-shadow: var(--sh-floating);
+  z-index: 4;
+}
+
+.trayText {
+  font-size: 12.5px;
+}
+
+.trayText b {
+  font-family: var(--font-mono);
+}
+
+.trayButton {
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 6px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+}
+
+.trayButton:disabled {
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: default;
+}
+
+.trayClear {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+
+.trayClear:hover {
+  color: #fff;
+}

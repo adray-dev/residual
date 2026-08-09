@@ -22,7 +22,12 @@ export interface PopupProps {
   record: ParcelRecord | null;
   vocab: Vocabulary;
   busy: boolean;
+  /** Whether this parcel is already queued for comparison. */
+  inCompare: boolean;
+  /** False when the compare set is full and this parcel is not in it. */
+  canCompare: boolean;
   onOpenFull: () => void;
+  onToggleCompare: () => void;
   onClose: () => void;
 }
 
@@ -37,7 +42,17 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function Popup({ at, record, vocab, busy, onOpenFull, onClose }: PopupProps) {
+export function Popup({
+  at,
+  record,
+  vocab,
+  busy,
+  inCompare,
+  canCompare,
+  onOpenFull,
+  onToggleCompare,
+  onClose,
+}: PopupProps) {
   // Clamped so a parcel near an edge does not push the card off screen. The right edge
   // also has to clear the drill-down rail when it is open, which is why the clamp reads
   // the live window rather than the handoff's fixed 340-1180 range.
@@ -119,8 +134,21 @@ export function Popup({ at, record, vocab, busy, onOpenFull, onClose }: PopupPro
         >
           {busy ? "Underwriting…" : "Open full underwriting"}
         </button>
-        <button className={styles.secondary} onClick={onClose}>
-          Close
+        {/* Comparison is a full-tier read on every column, so it is offered only where
+            there is something to compare — a non-scored parcel has no metrics. */}
+        <button
+          className={styles.secondary}
+          onClick={onToggleCompare}
+          disabled={!scored || (!inCompare && !canCompare)}
+          title={
+            inCompare
+              ? "Remove from the comparison"
+              : canCompare
+                ? "Add this parcel to the comparison"
+                : "The comparison already holds three parcels"
+          }
+        >
+          {inCompare ? "In compare ✓" : "Compare"}
         </button>
       </div>
     </div>
