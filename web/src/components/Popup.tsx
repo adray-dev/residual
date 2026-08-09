@@ -10,6 +10,7 @@
  * that divergence and requires it be labelled rather than reconciled away, which is what
  * the "Screening estimate" caption does.
  */
+import { useState } from "react";
 import type { ParcelRecord } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { PARCEL_ID_LABEL } from "../lib/vocabulary";
@@ -26,8 +27,12 @@ export interface PopupProps {
   inCompare: boolean;
   /** False when the compare set is full and this parcel is not in it. */
   canCompare: boolean;
+  /** Lists this parcel can be saved to, and which already hold it. */
+  lists: { shortlist_id: string; name: string }[];
+  memberOf: string[];
   onOpenFull: () => void;
   onToggleCompare: () => void;
+  onToggleSave: (shortlistId: string) => void;
   onClose: () => void;
 }
 
@@ -49,10 +54,14 @@ export function Popup({
   busy,
   inCompare,
   canCompare,
+  lists,
+  memberOf,
   onOpenFull,
   onToggleCompare,
+  onToggleSave,
   onClose,
 }: PopupProps) {
+  const [saving, setSaving] = useState(false);
   // Clamped so a parcel near an edge does not push the card off screen. The right edge
   // also has to clear the drill-down rail when it is open, which is why the clamp reads
   // the live window rather than the handoff's fixed 340-1180 range.
@@ -138,6 +147,14 @@ export function Popup({
             there is something to compare — a non-scored parcel has no metrics. */}
         <button
           className={styles.secondary}
+          onClick={() => setSaving((open) => !open)}
+          disabled={!scored}
+          title={lists.length ? "Save to a list" : "Create a list on the Shortlist screen first"}
+        >
+          {memberOf.length ? "Saved ✓" : "Save"}
+        </button>
+        <button
+          className={styles.secondary}
           onClick={onToggleCompare}
           disabled={!scored || (!inCompare && !canCompare)}
           title={
@@ -151,6 +168,32 @@ export function Popup({
           {inCompare ? "In compare ✓" : "Compare"}
         </button>
       </div>
+
+      {/* The list picker lives in the popup rather than a separate dialog: saving is a
+          one-click decision made while triaging, and bouncing to another screen to do it
+          would break the loop the map is for. */}
+      {saving && (
+        <div className={styles.picker}>
+          {lists.length === 0 ? (
+            <div className={styles.pickerEmpty}>
+              No lists yet — make one on the Shortlist screen.
+            </div>
+          ) : (
+            lists.map((list) => (
+              <button
+                key={list.shortlist_id}
+                className={styles.pickerRow}
+                onClick={() => onToggleSave(list.shortlist_id)}
+              >
+                <span>{list.name}</span>
+                <span className={styles.pickerMark}>
+                  {memberOf.includes(list.shortlist_id) ? "✓" : ""}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,306 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-alt);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+.bar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.close {
+  margin-left: auto;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--r-button);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* --- sidebar -------------------------------------------------------------- */
+.side {
+  width: 250px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--hairline);
+  padding: 14px 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sideHead {
+  padding: 0 16px 8px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  color: var(--ink-60);
+}
+
+.listRow:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.listRow.active {
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.listCount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--ink-25);
+}
+
+.listRow.active .listCount {
+  color: var(--accent);
+}
+
+.newList {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 4px;
+}
+
+.newInput {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-input);
+  padding: 0 9px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.newInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.newButton {
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r-input);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 11px;
+}
+
+.newButton:disabled {
+  background: var(--ink-25);
+  cursor: default;
+}
+
+/* --- totals --------------------------------------------------------------- */
+.totals {
+  margin: auto 12px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-inner-card);
+  padding: 12px;
+}
+
+.totalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  color: var(--ink-60);
+}
+
+.totalValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* --- cards ---------------------------------------------------------------- */
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 18px 20px 28px;
+}
+
+.tierNote {
+  font-size: 11.5px;
+  color: var(--ink-40);
+  line-height: 1.45;
+  margin-bottom: 14px;
+  max-width: 78ch;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-panel);
+  box-shadow: var(--sh-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardHead {
+  height: 82px;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 10px;
+}
+
+.chip {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-80);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+}
+
+.cardBody {
+  padding: 12px 14px 0;
+}
+
+.address {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.identity {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-40);
+  margin-top: 3px;
+}
+
+/* The three metrics share size and weight and differ only in colour — an explicit
+   correction in the handoff, kept deliberately. */
+.metrics {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 14px 12px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.metricValue {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+
+.metricValue.value {
+  color: var(--accent);
+}
+
+.metricValue.plain {
+  color: var(--ink);
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--hairline);
+  margin-top: auto;
+}
+
+.saved {
+  font-size: 11px;
+  color: var(--ink-40);
+}
+
+.link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+
+.link:hover {
+  background: var(--accent-tint);
+}
+
+.remove {
+  border: 0;
+  background: transparent;
+  color: var(--ink-25);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.remove:hover {
+  color: var(--negative);
+  background: var(--canvas);
+}
+
+.empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--ink-40);
+  font-size: 13px;
+  line-height: 1.6;
+}

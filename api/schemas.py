@@ -337,6 +337,43 @@ class ScenarioSaveRequest(UnderwriteRequest):
     name: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# /shortlists
+# ---------------------------------------------------------------------------
+class ShortlistCreate(BaseModel):
+    name: str
+
+
+class ShortlistSummary(BaseModel):
+    shortlist_id: str
+    name: str
+    parcel_count: int
+    created_at: datetime
+
+
+class ShortlistTotals(BaseModel):
+    """The 1f sidebar's "List totals" card. Every figure is live off the current bake."""
+    parcel_count: int
+    scored_count: int
+    combined_value: float
+    combined_floor_area: float
+    median_return: float | None = Field(
+        None,
+        description="Median, not mean — one deep-negative parcel would drag an average "
+                    "somewhere no member of the list actually is",
+    )
+
+
+class ShortlistDetail(BaseModel):
+    shortlist_id: str
+    name: str
+    created_at: datetime
+    computed_at: datetime = Field(description="The bake these numbers were read from")
+    parcels: list["ParcelRow"]
+    added_at: dict[str, datetime]
+    totals: ShortlistTotals
+
+
 class ExportRequest(UnderwriteRequest):
     """Export from the CURRENT inputs, with no saved scenario required.
 

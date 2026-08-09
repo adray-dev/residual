@@ -117,6 +117,33 @@ export interface MapQuery {
   irr_filter_applied: boolean;
 }
 
+export interface ShortlistSummary {
+  shortlist_id: string;
+  name: string;
+  parcel_count: number;
+  created_at: string;
+}
+
+export interface ShortlistTotals {
+  parcel_count: number;
+  scored_count: number;
+  combined_value: number;
+  combined_floor_area: number;
+  /** Median, not mean — one deep-negative parcel would drag an average off the list. */
+  median_return: number | null;
+}
+
+export interface ShortlistDetail {
+  shortlist_id: string;
+  name: string;
+  created_at: string;
+  /** The bake these numbers were read from — a shortlist never freezes a figure. */
+  computed_at: string;
+  parcels: ParcelRow[];
+  added_at: Record<string, string>;
+  totals: ShortlistTotals;
+}
+
 export interface ZoningInfo {
   zone_code: string | null;
   district_code: string | null;

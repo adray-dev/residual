@@ -10,11 +10,22 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: Object.fromEntries(
-      // Prefix matches, so "/scenario" also covers "/scenarios" and "/scenario/{id}/export".
-      // Every API path the client can reach must be listed: an unproxied one silently
-      // returns the dev server's index.html, which fails as "unexpected token '<'" rather
-      // than as anything resembling a missing route.
-      ["/meta", "/map", "/parcel", "/assumptions", "/scenario", "/tiles", "/health"].map((path) => [
+      // Every top-level prefix the API serves, checked against `/openapi.json` rather than
+      // remembered. An unproxied route silently returns the dev server's index.html, so it
+      // fails as "unexpected token '<'" instead of as a missing route — that has now cost
+      // debugging time twice (/scenario, then /shortlists), which is why this list is
+      // derived from the route table and not from whatever the last feature happened to add.
+      [
+        "/meta",
+        "/map",
+        "/parcel",      // also covers /parcels/search
+        "/assumptions",
+        "/scenario",    // also covers /scenarios
+        "/shortlists",
+        "/export.xlsx",
+        "/tiles",
+        "/health",
+      ].map((path) => [
         path,
         { target: process.env.API_ORIGIN ?? "http://127.0.0.1:8000", changeOrigin: true },
       ]),

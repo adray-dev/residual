@@ -4,6 +4,8 @@ import type {
   MapQuery,
   Meta,
   ParcelRecord,
+  ShortlistDetail,
+  ShortlistSummary,
   Underwrite,
   UnderwriteRequest,
 } from "./types";
@@ -95,6 +97,43 @@ export function getMapQuery(
  * full model is a separate, deliberate step the user takes from the popup. */
 export function getParcel(parcelId: string, signal?: AbortSignal): Promise<ParcelRecord> {
   return request<ParcelRecord>(parcelPath(parcelId), { signal });
+}
+
+// --- shortlists ------------------------------------------------------------
+// Pure user state. The card metrics are read live from the current bake every time, so a
+// list cannot go stale against a re-bake — the opposite of a scenario, which freezes.
+export function getShortlists(): Promise<ShortlistSummary[]> {
+  return request<ShortlistSummary[]>("/shortlists");
+}
+
+export function getShortlist(shortlistId: string): Promise<ShortlistDetail> {
+  return request<ShortlistDetail>(`/shortlists/${encodeURIComponent(shortlistId)}`);
+}
+
+export function createShortlist(name: string): Promise<ShortlistSummary> {
+  return request<ShortlistSummary>("/shortlists", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+async function noContent(path: string, method: string): Promise<void> {
+  const response = await fetch(path, { method });
+  if (!response.ok) throw new ApiError(await failure(response), response.status);
+}
+
+export function addToShortlist(shortlistId: string, parcelId: string): Promise<void> {
+  return noContent(
+    `/shortlists/${encodeURIComponent(shortlistId)}/parcels/${encodeURIComponent(parcelId)}`,
+    "POST",
+  );
+}
+
+export function removeFromShortlist(shortlistId: string, parcelId: string): Promise<void> {
+  return noContent(
+    `/shortlists/${encodeURIComponent(shortlistId)}/parcels/${encodeURIComponent(parcelId)}`,
+    "DELETE",
+  );
 }
 
 /** Default-assumption underwrite. Cached server-side, so reopening a parcel is free. */

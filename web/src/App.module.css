@@ -26,7 +26,7 @@
 }
 
 .batch {
-  margin-left: auto;
+  margin-left: 14px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--ink-40);
@@ -88,4 +88,34 @@
 
 .error {
   color: var(--negative);
+}
+
+/* Top-bar entry to the shortlist screen, with the handoff's teal count badge. */
+.topAction {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-80);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: var(--r-button);
+}
+
+.topAction:hover {
+  background: var(--canvas);
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
 }

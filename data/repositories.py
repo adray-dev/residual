@@ -668,6 +668,116 @@ def iter_map_geojson(conn, computed_at: datetime, batch_size: int = 5_000) -> It
 
 
 # ---------------------------------------------------------------------------
+# shortlists (SPEC §7.1, Stage D)
+#
+# Pure user state: named collections of parcel ids with no model output of their own. The
+# 1f card metrics are read LIVE from the latest bake for the member parcels, so a shortlist
+# can never go stale against a re-bake and never freezes a number. Scenarios are deliberately
+# the opposite — they freeze, via `market_snapshot`.
+# ---------------------------------------------------------------------------
+def create_shortlist(conn, shortlist_id: str, name: str, user_id: str = "local") -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO shortlists (shortlist_id, name, user_id)
+               VALUES (%s, %s, %s) RETURNING shortlist_id""",
+            (shortlist_id, name, user_id),
+        )
+        return cur.fetchone()["shortlist_id"]
+
+
+def rename_shortlist(conn, shortlist_id: str, name: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE shortlists SET name = %s WHERE shortlist_id = %s", (name, shortlist_id)
+        )
+        return cur.rowcount > 0
+
+
+def delete_shortlist(conn, shortlist_id: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM shortlists WHERE shortlist_id = %s", (shortlist_id,))
+        return cur.rowcount > 0
+
+
+def list_shortlists(conn, user_id: str = "local") -> list[dict]:
+    """Every list with its member count — the 1f sidebar, in one query."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT s.shortlist_id, s.name, s.created_at,
+                      count(sp.ssl) AS parcel_count
+                 FROM shortlists s
+                 LEFT JOIN shortlist_parcels sp USING (shortlist_id)
+                WHERE s.user_id = %s
+                GROUP BY s.shortlist_id, s.name, s.created_at
+                ORDER BY s.created_at""",
+            (user_id,),
+        )
+        return cur.fetchall()
+
+
+def get_shortlist(conn, shortlist_id: str) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT shortlist_id, name, created_at FROM shortlists WHERE shortlist_id = %s",
+            (shortlist_id,),
+        )
+        return cur.fetchone()
+
+
+def add_to_shortlist(conn, shortlist_id: str, ssl: str) -> bool:
+    """Idempotent: adding a parcel twice is a no-op, not an error."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO shortlist_parcels (shortlist_id, ssl) VALUES (%s, %s)
+               ON CONFLICT DO NOTHING""",
+            (shortlist_id, ssl),
+        )
+        return cur.rowcount > 0
+
+
+def remove_from_shortlist(conn, shortlist_id: str, ssl: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM shortlist_parcels WHERE shortlist_id = %s AND ssl = %s",
+            (shortlist_id, ssl),
+        )
+        return cur.rowcount > 0
+
+
+def shortlists_for_parcel(conn, ssl: str, user_id: str = "local") -> list[str]:
+    """Which lists already hold this parcel — so the popup can show its state."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT sp.shortlist_id FROM shortlist_parcels sp
+                 JOIN shortlists s USING (shortlist_id)
+                WHERE sp.ssl = %s AND s.user_id = %s""",
+            (ssl, user_id),
+        )
+        return [row["shortlist_id"] for row in cur.fetchall()]
+
+
+def shortlist_members(conn, shortlist_id: str, computed_at: datetime | None = None) -> list[dict]:
+    """Members with their CURRENT bake row — never a stored copy.
+
+    Same column shape as `map_query`, so the same serializer renders both and a shortlist
+    card cannot drift from the table row for the same parcel.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT {_MAP_SELECT}, sp.added_at
+                  FROM shortlist_parcels sp
+                  JOIN bake_results b ON b.ssl = sp.ssl
+                  JOIN parcels p ON p.ssl = sp.ssl
+                 WHERE sp.shortlist_id = %s
+                   AND b.computed_at = COALESCE(%s, {LATEST_BATCH})
+                   AND b.is_best
+                 ORDER BY b.rlv_total DESC NULLS LAST, sp.added_at""",
+            (shortlist_id, computed_at),
+        )
+        return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
 # scenarios (SPEC §7.1, §10)
 # ---------------------------------------------------------------------------
 def upsert_assumption_set(conn, row: Mapping) -> None:

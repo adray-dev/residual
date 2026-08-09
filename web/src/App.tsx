@@ -17,12 +17,24 @@ import {
   getDefaultAssumptions,
   getMeta,
   getParcel,
+  getShortlist,
+  getShortlists,
+  createShortlist,
+  addToShortlist,
+  removeFromShortlist,
   getUnderwrite,
   postUnderwrite,
   saveScenario,
   exportWorkbook,
 } from "./lib/api";
-import type { AssumptionSet, Meta, ParcelRecord, Underwrite } from "./lib/types";
+import type {
+  AssumptionSet,
+  Meta,
+  ParcelRecord,
+  ShortlistDetail,
+  ShortlistSummary,
+  Underwrite,
+} from "./lib/types";
 import { changeCount, type Overrides } from "./lib/assumptions";
 import { InputsModal } from "./components/InputsModal";
 import { Vocabulary } from "./lib/vocabulary";
@@ -33,6 +45,7 @@ import { Legend } from "./components/Legend";
 import { MapView } from "./components/MapView";
 import { Popup } from "./components/Popup";
 import { Compare, CompareTray } from "./components/Compare";
+import { Shortlist } from "./components/Shortlist";
 import { MAX_COMPARE, toggleCompare } from "./lib/compare";
 import styles from "./App.module.css";
 
@@ -75,10 +88,17 @@ export function App() {
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [compareRows, setCompareRows] = useState<Underwrite[] | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [lists, setLists] = useState<ShortlistSummary[]>([]);
+  const [activeList, setActiveList] = useState<string | null>(null);
+  const [listDetail, setListDetail] = useState<ShortlistDetail | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  const [listBusy, setListBusy] = useState(false);
+  const [memberOf, setMemberOf] = useState<string[]>([]);
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
+    getShortlists().then(setLists).catch(() => undefined);
     Promise.all([getMeta(), getDefaultAssumptions()])
       .then(([response, assumptions]) => {
         if (!live) return;
@@ -97,6 +117,7 @@ export function App() {
   /** Map click: show the popup immediately, fill in the record when it lands. */
   const select = useCallback((parcelId: string, at: { x: number; y: number }) => {
     setSelection({ parcelId, at, record: null });
+    setMemberOf([]);
     setPanel({ kind: "closed" });
     getParcel(parcelId)
       .then((record) =>
@@ -273,6 +294,46 @@ export function App() {
       .finally(() => setExporting(false));
   }, [selection?.parcelId, selectedFromLink, overrides, demolition, failed]);
 
+  // --- shortlists --------------------------------------------------------
+  const openList = useCallback((shortlistId: string) => {
+    setActiveList(shortlistId);
+    setListBusy(true);
+    getShortlist(shortlistId)
+      .then(setListDetail)
+      .catch(() => setListDetail(null))
+      .finally(() => setListBusy(false));
+  }, []);
+
+  const refreshLists = useCallback(
+    (focus?: string) =>
+      getShortlists().then((next) => {
+        setLists(next);
+        const target = focus ?? activeList ?? next[0]?.shortlist_id ?? null;
+        if (target) openList(target);
+        return next;
+      }),
+    [activeList, openList],
+  );
+
+  /** Toggle this parcel's membership of one list, from the popup. */
+  const toggleSave = useCallback(
+    (shortlistId: string) => {
+      const parcelId = selection?.parcelId;
+      if (!parcelId) return;
+      const isMember = memberOf.includes(shortlistId);
+      const action = isMember
+        ? removeFromShortlist(shortlistId, parcelId)
+        : addToShortlist(shortlistId, parcelId);
+      setMemberOf((ids) =>
+        isMember ? ids.filter((id) => id !== shortlistId) : [...ids, shortlistId],
+      );
+      action
+        .then(() => getShortlists().then(setLists))
+        .catch((error: unknown) => setPanel(failed(error, false)));
+    },
+    [selection?.parcelId, memberOf, failed],
+  );
+
   const closePanel = useCallback(() => setPanel({ kind: "closed" }), []);
 
   /** Resolve the compare set. Each column is its own full model run (SPEC §9 keeps levered
@@ -304,6 +365,20 @@ export function App() {
       <header className={styles.topbar}>
         <Logo />
         <span className={styles.wordmark}>Residual</span>
+        <button
+          className={styles.topAction}
+          onClick={() => {
+            setListOpen(true);
+            if (!listDetail && lists[0]) openList(lists[0].shortlist_id);
+          }}
+        >
+          Shortlist
+          {lists.length > 0 && (
+            <span className={styles.badge}>
+              {lists.reduce((n, l) => n + l.parcel_count, 0)}
+            </span>
+          )}
+        </button>
         {meta && (
           <span className={styles.batch}>
             {meta.parcel_count.toLocaleString()} parcels · baked{" "}
@@ -362,6 +437,9 @@ export function App() {
               onToggleCompare={() =>
                 setCompareIds((ids) => toggleCompare(ids, selection.parcelId))
               }
+              lists={lists}
+              memberOf={memberOf}
+              onToggleSave={toggleSave}
               onClose={dismiss}
             />
           )}
@@ -415,6 +493,34 @@ export function App() {
           <div className={`${styles.panelState} ${styles.error}`}>{panel.message}</div>
         )}
       </main>
+
+      {listOpen && vocab && (
+        <Shortlist
+          lists={lists}
+          active={activeList}
+          detail={listDetail}
+          vocab={vocab}
+          busy={listBusy}
+          onSelect={openList}
+          onCreate={(name) =>
+            createShortlist(name)
+              .then((created) => refreshLists(created.shortlist_id))
+              .catch((error: unknown) => setPanel(failed(error, false)))
+          }
+          onOpenParcel={(parcelId) => {
+            setListOpen(false);
+            setSelectedFromLink(parcelId);
+            underwrite(parcelId);
+          }}
+          onRemove={(parcelId) => {
+            if (!activeList) return;
+            removeFromShortlist(activeList, parcelId)
+              .then(() => refreshLists(activeList))
+              .catch((error: unknown) => setPanel(failed(error, false)));
+          }}
+          onClose={() => setListOpen(false)}
+        />
+      )}
 
       {compareRows && vocab && (
         <Compare rows={compareRows} vocab={vocab} onClose={() => setCompareRows(null)} />
