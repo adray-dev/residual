@@ -335,3 +335,68 @@ def test_a_market_override_does_not_leak_into_the_next_parcel(client, scored):
     after = client.get(f"/parcel/{scored}/underwrite").json()
     assert after["feasibility_value"]["full"] == before["feasibility_value"]["full"]
     assert after["overrides_changed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# §6.4 — sources and uses must close
+# ---------------------------------------------------------------------------
+# Sources and uses are the same money counted two ways. If they disagree, one of the two
+# is wrong, and the drill-down refuses to draw the chart — so this is a correctness gate,
+# not a presentation one. It stayed broken for a while because it only appears once an
+# assumption is EDITED, and the default run balances.
+BALANCE_CASES = [
+    ("defaults", {}),
+    ("soft cost 25%", {"cost": {"soft_cost_pct": 0.25}}),
+    ("contingency 10%", {"cost": {"contingency_pct": 0.10}}),
+    ("construction LTC 70%", {"debt": {"construction_ltc": 0.70}}),
+    ("construction LTC 50%", {"debt": {"construction_ltc": 0.50}}),
+    ("construction rate 12%", {"debt": {"construction_annual_rate": 0.12}}),
+    ("perm LTV 40%", {"debt": {"perm_ltv": 0.40}}),
+    ("perm rate 9%", {"debt": {"perm_annual_rate": 0.09}}),
+    ("min DSCR 1.6", {"debt": {"perm_min_dscr": 1.6}}),
+    ("exit cap 5.0%", {"exit": {"exit_cap_rate": 0.05}}),
+    ("exit cap 7.0%", {"exit": {"exit_cap_rate": 0.07}}),
+    ("rent +$1", {"revenue": {"rent_psf_residential_monthly": 4.6}}),
+    ("occupancy 85%", {"revenue": {"stabilized_occupancy": 0.85}}),
+    ("demolition on", {"include_demolition": True}),
+    ("several at once", {"debt": {"construction_ltc": 0.72, "perm_ltv": 0.45},
+                         "exit": {"exit_cap_rate": 0.048},
+                         "cost": {"soft_cost_pct": 0.23}}),
+]
+
+
+@pytest.mark.parametrize("label,overrides", BALANCE_CASES, ids=[c[0] for c in BALANCE_CASES])
+def test_sources_and_uses_balance_under_every_edit(client, scored, label, overrides):
+    """The identity the capital stack has to satisfy, across the inputs the 1c modal
+    actually lets a user change.
+
+    The failure this pins: development equity was summed from negative equity cash flows
+    over the WHOLE hold, so a cash-in refinancing at stabilization (perm loan smaller than
+    the construction balance) and any operating shortfall during hold were both counted as
+    development sources — with no matching use. The gap equalled those flows exactly.
+    """
+    body = client.post(f"/parcel/{scored}/underwrite", json=overrides).json()
+    su = body["sources_uses"]
+    gap = su["sources_total"] - su["uses_total"]
+    assert abs(gap) < 1.0, f"{label}: sources and uses differ by ${gap:,.0f}"
+    assert su["balanced"] is True, label
+
+
+def test_uses_and_sources_each_sum_to_their_own_total(client, scored):
+    """The line items must add up to the total shown beside them, or the chart's bars and
+    its caption are telling different stories."""
+    su = client.get(f"/parcel/{scored}/underwrite").json()["sources_uses"]
+    assert sum(su["uses"].values()) == pytest.approx(su["uses_total"], abs=0.01)
+    assert sum(su["sources"].values()) == pytest.approx(su["sources_total"], abs=0.01)
+
+
+def test_a_refinancing_shortfall_is_still_reported_somewhere(client, scored):
+    """Excluding post-stabilization cash-in from the DEVELOPMENT sources & uses must not
+    make it disappear from the model: peak equity spans the whole hold and still carries
+    it, so the capital a developer actually has to find is never understated."""
+    body = client.post(
+        f"/parcel/{scored}/underwrite", json={"debt": {"construction_ltc": 0.70}}
+    ).json()
+    peak = body["returns"]["peak_equity"]
+    development_equity = body["sources_uses"]["sources"]["equity"]
+    assert peak is not None and peak >= development_equity

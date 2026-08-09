@@ -145,14 +145,12 @@ def test_demolition_scenario_workbook_matches_the_engine(client, parcels, tmp_pa
     _assert_matches(_export(client, parcel_id, **body), _engine(client, parcel_id, **body), tmp_path)
 
 
-def test_sources_and_uses_reproduces_the_engine_including_its_imbalance(
-    client, parcels, tmp_path
-):
-    """The workbook must agree with the TOOL, not with an idealised model.
+def test_sources_and_uses_balance_in_the_workbook_too(client, parcels, tmp_path):
+    """The workbook computes the capital stack the same way the API does, so the §6.4 fix
+    reaches the spreadsheet by construction rather than by being ported.
 
-    Sources and uses currently diverge on edited scenarios (KNOWN_ISSUES). The export
-    reproduces that rather than quietly computing something the app does not show, and the
-    gap is surfaced in a check cell.
+    Asserted against the API's own totals, not against zero: the property that matters is
+    that the file agrees with the tool it came from. That it now also closes is the fix.
     """
     body = {"debt": {"construction_ltc": 0.70}}
     parcel_id = parcels[0]
@@ -188,6 +186,7 @@ def test_sources_and_uses_reproduces_the_engine_including_its_imbalance(
     assert values[where["Sources − uses"]] == pytest.approx(
         su["sources_total"] - su["uses_total"], abs=CENT
     )
+    assert abs(values[where["Sources − uses"]]) < 1.0, "the stack should close"
 
 
 def test_export_needs_no_saved_scenario(client, parcels):

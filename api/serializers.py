@@ -212,6 +212,27 @@ def underwrite_response(result: dict) -> dict:
         + np.asarray(cf.soft_cost, dtype=float)
         + np.asarray(cf.contingency, dtype=float)
     )
+    # DEVELOPMENT equity: the cash put in before stabilization, and only that.
+    #
+    # This used to sum negative equity flows across the whole hold, which silently swept in
+    # two post-development things: a cash-in refinancing at stabilization (when the perm
+    # loan comes in below the construction balance) and any month of operating shortfall
+    # during hold. Both are real capital, but neither is a source that funded the BUILD, and
+    # neither has a matching entry on the uses side — so sources exceeded uses by exactly
+    # those flows. It only showed up once an assumption was edited, because the default run
+    # has no shortfall of either kind.
+    #
+    # Scoped to the development period the identity is exact rather than approximate:
+    #   sources = (draws + interest) + equity
+    #           = (total_cost - equity_needed + interest) + equity_needed
+    #           = total_cost + interest
+    #           = uses
+    #
+    # Nothing is lost by excluding the later flows: `peak_equity` spans the whole hold and
+    # still carries them, so the capital a developer has to find is never understated.
+    # Full length, because the S-curve's equity series runs the whole timeline. Only the
+    # sources & uses TOTAL is scoped to the development period.
+    stabilization = int(cf.phase_bounds["stabilization"])
     equity_draws = -np.minimum(np.asarray(cf.equity_cf, dtype=float), 0.0)
 
     hard_total = float(np.sum(cf.hard_cost))
@@ -219,7 +240,7 @@ def underwrite_response(result: dict) -> dict:
     contingency_total = float(np.sum(cf.contingency))
     land_total = float(np.sum(cf.land))
     interest_total = float(np.sum(cf.construction_interest))
-    equity_total = float(np.sum(equity_draws))
+    equity_total = float(np.sum(equity_draws[:stabilization]))
 
     # The construction loan is principal draws PLUS capitalized interest. Interest is not
     # paid in cash during construction — it accrues onto the balance (§6.4), so the loan

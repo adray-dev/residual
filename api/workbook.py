@@ -30,10 +30,11 @@ Two things are NOT live, and both are labelled in the sheet rather than hidden:
     grid and are resolved upstream by `fit_program`, so changing them needs a re-export.
     They are shown in a separate block marked structural.
 
-Sources & Uses reproduces `serializers.underwrite_response` EXACTLY, including the open
-imbalance in KNOWN_ISSUES: matching the tool is the trust property, so the workbook must not
-quietly disagree with the panel it came from. The gap is surfaced in a check cell with a
-note, and when the §6.4 bug is fixed both sides move together.
+Sources & Uses reproduces `serializers.underwrite_response` EXACTLY, because matching the
+tool is the trust property — the workbook must not quietly disagree with the panel it came
+from. A check cell shows sources minus uses, which reads $0; when the §6.4 development-
+equity scoping was fixed, this sheet inherited it by construction rather than by being
+ported, which is what that coupling was for.
 """
 from __future__ import annotations
 
@@ -539,13 +540,18 @@ def build(result: dict) -> Workbook:
     r = _title(sws, r, "SOURCES")
     r += 1
     # Reproduces `serializers.underwrite_response` exactly: the loan is principal draws PLUS
-    # capitalized interest, and equity is the sum of negative equity cash flows.
+    # capitalized interest, and equity is the cash put in BEFORE stabilization.
+    #
+    # The development cut-off is the point (§6.4). A cash-in refinancing at takeout and any
+    # operating shortfall during hold are real capital but are not sources that funded the
+    # build, and they have no matching entry in uses — counting them is what used to make
+    # the two sides disagree.
     r = s.label_value(
         r, "s_loan", "Construction loan",
         f"={total_of('draw')}+{total_of('interest')}", MONEY,
     )
     r = s.label_value(
-        r, "s_equity", "Equity", f"={xref('cum_eq_cf', months - 1)}", MONEY,
+        r, "s_equity", "Equity", f"={xref('cum_eq_cf', stab - 1)}", MONEY,
     )
     r = s.label_value(
         r, "sources_total", "Total sources", f"={s.at['s_loan']}+{s.at['s_equity']}", MONEY,
@@ -558,15 +564,9 @@ def build(result: dict) -> Workbook:
     )
     r = _note(
         sws, r,
-        "This should be $0. It is not, on scenarios with edited assumptions — a known open "
-        "defect in the engine's §6.4 capitalized-interest reporting (see KNOWN_ISSUES.md).",
-        warn=True,
-    )
-    r = _note(
-        sws, r,
-        "The workbook reproduces the engine exactly rather than silently disagreeing with "
-        "the tool, so this figure matches what the app shows. Both are fixed together.",
-        warn=True,
+        "Sources and uses are the same money counted twice, so this reads $0 — including "
+        "after you edit an input above. If it ever does not, the capital stack has not "
+        "closed and the figures beside it should not be relied on.",
     )
 
     # =======================================================================
