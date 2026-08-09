@@ -20,16 +20,18 @@ export interface FilterState {
   /** Screening RLV floor/ceiling in dollars. Null means unbounded. */
   rlvMin: number | null;
   rlvMax: number | null;
-  /** Minimum IRR. Runs the full model per matching parcel, so the server bounds it. */
-  irrMin: number | null;
 }
+
+// IRR is deliberately NOT a filter. It is absent from the tile — levered IRR is not in the
+// bake — so filtering on it can only ever narrow a server count, never the map, and doing
+// it at all means running the full model over every match. The API still accepts `irr_min`
+// and still bounds it; the client simply does not use it until IRR is in the tile.
 
 export const EMPTY_FILTERS: FilterState = {
   wards: [],
   prototypes: [],
   rlvMin: null,
   rlvMax: null,
-  irrMin: null,
 };
 
 export function isEmpty(state: FilterState): boolean {
@@ -37,8 +39,7 @@ export function isEmpty(state: FilterState): boolean {
     state.wards.length === 0 &&
     state.prototypes.length === 0 &&
     state.rlvMin == null &&
-    state.rlvMax == null &&
-    state.irrMin == null
+    state.rlvMax == null
   );
 }
 
@@ -74,10 +75,6 @@ export function mapFilter(state: FilterState): FilterSpecification | null {
     }
   }
 
-  // IRR is deliberately NOT in the map expression. It does not exist in the tile — levered
-  // IRR is absent from the bake by design — so it can only narrow the server-side count and
-  // the table, never the map's paint. Trying to fake it client-side would dim parcels on a
-  // number the tile does not carry.
   if (!clauses.length) return null;
   return ["all", ...clauses] as FilterSpecification;
 }
@@ -94,7 +91,6 @@ export function queryParams(state: FilterState): Record<string, string | number 
   if (state.prototypes.length) params.prototypes = state.prototypes;
   if (state.rlvMin != null) params.rlv_min = state.rlvMin;
   if (state.rlvMax != null) params.rlv_max = state.rlvMax;
-  if (state.irrMin != null) params.irr_min = state.irrMin;
   return params;
 }
 

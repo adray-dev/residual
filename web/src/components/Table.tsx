@@ -94,9 +94,6 @@ function chipsFor(state: FilterState, vocab: Vocabulary): { label: string; clear
   if (state.rlvMax != null) {
     chips.push({ label: `Value ≤ ${money(state.rlvMax, 1)}`, clear: { rlvMax: null } });
   }
-  if (state.irrMin != null) {
-    chips.push({ label: `IRR ≥ ${percent(state.irrMin, 1)}`, clear: { irrMin: null } });
-  }
   return chips;
 }
 

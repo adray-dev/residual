@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { getMapQuery, NotModellable } from "../lib/api";
-import { money, percent } from "../lib/format";
+import { money } from "../lib/format";
 import { EMPTY_FILTERS, isEmpty, queryParams, toggle, type FilterState } from "../lib/filters";
 import styles from "./Filters.module.css";
 
@@ -52,8 +52,8 @@ export function Filters({
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
-          // The server refuses an IRR filter over too large a set with an actionable
-          // sentence; show it rather than a silent empty count.
+          // A 422 carries an actionable sentence from the server; show it rather than
+          // leaving a silently stale count on screen.
           if (error instanceof NotModellable) setNote(error.message);
           setStale(false);
         });
@@ -102,10 +102,9 @@ export function Filters({
           <div className={`micro-label ${styles.groupLabel}`}>
             {vocab.metric("rlv_total")}
           </div>
-          <div className={styles.readout}>
-            {money(state.rlvMin ?? floor, 1)} – {money(state.rlvMax ?? ceiling, 1)}
-          </div>
-          <input
+          <div className={styles.sliderRow}>
+            <span className={styles.sliderLabel}>Min</span>
+            <input
             className={styles.slider}
             type="range"
             min={floor}
@@ -121,8 +120,12 @@ export function Filters({
               const value = Math.min(Number(event.target.value), ceilingForMin);
               set({ rlvMin: value <= floor ? null : value });
             }}
-          />
-          <input
+            />
+            <span className={styles.sliderValue}>{money(state.rlvMin ?? floor, 1)}</span>
+          </div>
+          <div className={styles.sliderRow}>
+            <span className={styles.sliderLabel}>Max</span>
+            <input
             className={styles.slider}
             type="range"
             min={floor}
@@ -135,32 +138,8 @@ export function Filters({
               const value = Math.max(Number(event.target.value), floorForMax);
               set({ rlvMax: value >= ceiling ? null : value });
             }}
-          />
-        </div>
-
-        <div className={styles.group}>
-          <div className={`micro-label ${styles.groupLabel}`}>Desired IRR</div>
-          <div className={styles.readout}>
-            {state.irrMin == null ? "Any" : `${percent(state.irrMin, 1)} or better`}
-          </div>
-          <input
-            className={styles.slider}
-            type="range"
-            min={0}
-            max={0.5}
-            step={0.005}
-            value={state.irrMin ?? 0}
-            aria-label="Minimum IRR"
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              set({ irrMin: value <= 0 ? null : value });
-            }}
-          />
-          {/* IRR is not in the bake, so filtering on it runs the full model per matching
-              parcel. The server refuses above its bound with an actionable sentence, which
-              lands in `note` below rather than silently returning nothing. */}
-          <div className={styles.hint}>
-            Runs the full model on every match — narrow by ward first on large sets.
+            />
+            <span className={styles.sliderValue}>{money(state.rlvMax ?? ceiling, 1)}</span>
           </div>
         </div>
 
