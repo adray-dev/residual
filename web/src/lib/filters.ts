@@ -20,8 +20,6 @@ export interface FilterState {
   /** Screening RLV floor/ceiling in dollars. Null means unbounded. */
   rlvMin: number | null;
   rlvMax: number | null;
-  /** Hide the four non-scored statuses, which carry no value to compare. */
-  scoredOnly: boolean;
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -29,7 +27,6 @@ export const EMPTY_FILTERS: FilterState = {
   prototypes: [],
   rlvMin: null,
   rlvMax: null,
-  scoredOnly: false,
 };
 
 export function isEmpty(state: FilterState): boolean {
@@ -37,8 +34,7 @@ export function isEmpty(state: FilterState): boolean {
     state.wards.length === 0 &&
     state.prototypes.length === 0 &&
     state.rlvMin == null &&
-    state.rlvMax == null &&
-    !state.scoredOnly
+    state.rlvMax == null
   );
 }
 
@@ -48,12 +44,15 @@ export function toggle(list: string[], value: string): string[] {
 }
 
 /**
- * The MapLibre filter for parcels that MATCH. Non-matching parcels are not hidden —
- * they are drawn in a muted layer instead (see MapView), because a filter that erases
- * two thirds of the city leaves the user staring at floating fragments with no sense of
+ * The MapLibre filter for scored parcels that MATCH. Non-matching parcels are not hidden —
+ * they are drawn in a muted layer instead (see MapView), because a filter that erases most
+ * of what is on screen leaves the user staring at floating fragments with no sense of
  * where they are. Dimming keeps the street grid legible.
  */
 export function mapFilter(state: FilterState): FilterSpecification | null {
+  // Scored is not a filter any more, it is the premise: the product visualises feasibility,
+  // and a parcel with no feasibility has nothing to place on the ramp. It is applied in the
+  // layer definitions rather than here, so this only ever narrows WITHIN the scored set.
   const clauses: ExpressionSpecification[] = [];
 
   if (state.wards.length) {
@@ -62,13 +61,7 @@ export function mapFilter(state: FilterState): FilterSpecification | null {
   if (state.prototypes.length) {
     clauses.push(["in", ["get", "proto"], ["literal", state.prototypes]]);
   }
-  if (state.scoredOnly) {
-    clauses.push(["==", ["get", "status"], "scored"]);
-  }
-  // A value bound is a statement about a value, so it can only apply to parcels that have
-  // one. Non-scored parcels carry a null `rlv` and must not be swept up by "over $1M".
   if (state.rlvMin != null || state.rlvMax != null) {
-    clauses.push(["==", ["get", "status"], "scored"]);
     if (state.rlvMin != null) {
       clauses.push([">=", ["coalesce", ["get", "rlv"], -Infinity], state.rlvMin]);
     }
@@ -86,14 +79,13 @@ export function queryParams(state: FilterState): Record<string, string | number 
   const params: Record<string, string | number | string[]> = {
     // One row is enough: the count comes from `total`, which is computed before paging.
     limit: 1,
+    // Always. The read path has the same premise as the map.
+    statuses: ["scored"],
   };
   if (state.wards.length) params.wards = state.wards;
   if (state.prototypes.length) params.prototypes = state.prototypes;
   if (state.rlvMin != null) params.rlv_min = state.rlvMin;
   if (state.rlvMax != null) params.rlv_max = state.rlvMax;
-  if (state.scoredOnly || state.rlvMin != null || state.rlvMax != null) {
-    params.statuses = ["scored"];
-  }
   return params;
 }
 

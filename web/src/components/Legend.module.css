@@ -76,6 +76,18 @@
   margin: 12px 0 10px;
 }
 
+.excluded {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--ink-40);
+}
+
+.excluded strong {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink-60);
+}
+
 .status {
   display: flex;
   align-items: center;

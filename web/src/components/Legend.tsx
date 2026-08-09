@@ -1,14 +1,14 @@
 /** The map legend: what the colours mean, and the control that switches objective.
  *
- * Every status the bake can emit is listed with its count, because SPEC §9's rule is that
- * every parcel gets a row and every colour is explainable. A legend that showed only the
- * value ramp would leave a third of the city's parcels coloured by nothing the user can
- * look up.
+ * SPEC §9's rule is that every colour on the map is explainable. The map now draws ONLY
+ * scored parcels, so there is exactly one colour system to explain — the value ramp — and
+ * the status swatches went with the statuses. What replaced them is a count of what is not
+ * shown, because a large silent absence reads as missing data rather than as a decision.
  */
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { money, rate } from "../lib/format";
-import { LEGEND_GRADIENT, OBJECTIVE_METRIC, STATUS_COLORS } from "../lib/mapStyle";
+import { LEGEND_GRADIENT, OBJECTIVE_METRIC } from "../lib/mapStyle";
 import styles from "./Legend.module.css";
 
 /** Chrome copy for the segmented control, which cannot hold the full metric names
@@ -46,12 +46,13 @@ export function Legend({
   const positive = ramp?.positive_count ?? 0;
   const scored = negative + positive;
 
-  const statuses: [keyof typeof STATUS_COLORS, string][] = [
-    ["infeasible", "infeasible"],
-    ["exempt", "exempt"],
-    ["historic", "historic"],
-    ["zone_not_encoded", "zone_not_encoded"],
-  ];
+  // The status swatches are gone with the statuses themselves: the map draws only scored
+  // parcels, so there is no shade left to explain. What replaces them is a plain statement
+  // of what is NOT on the map, because 53,559 parcels quietly missing would otherwise read
+  // as a gap in the data rather than a deliberate exclusion.
+  const excluded = Object.entries(meta.status_counts)
+    .filter(([status]) => status !== "scored")
+    .reduce((n, [, value]) => n + value, 0);
 
   return (
     <div className={styles.panel}>
@@ -88,32 +89,11 @@ export function Legend({
 
       <div className={styles.rule} />
 
-      {statuses.map(([colorKey, statusKey]) => {
-        const count = meta.status_counts[statusKey];
-        if (!count) return null;
-        return (
-          <div className={styles.status} key={statusKey}>
-            <span
-              className={styles.swatch}
-              style={
-                statusKey === "exempt"
-                  ? {
-                      backgroundImage: `repeating-linear-gradient(45deg,${STATUS_COLORS.exempt} 0 3px,${STATUS_COLORS.exempt_alt} 3px 6px)`,
-                    }
-                  : statusKey === "zone_not_encoded"
-                    ? {
-                        background: STATUS_COLORS.zone_not_encoded,
-                        borderStyle: "dashed",
-                        borderColor: STATUS_COLORS.zone_not_encoded_border,
-                      }
-                    : { background: STATUS_COLORS[colorKey] }
-              }
-            />
-            {vocab.status(statusKey)}
-            <span className={styles.count}>{count.toLocaleString()}</span>
-          </div>
-        );
-      })}
+      <div className={styles.excluded}>
+        Showing the <strong>{scored.toLocaleString()}</strong> parcels the model could
+        price. {excluded.toLocaleString()} more are not shown — public or tax-exempt land,
+        historic districts, and zoning not yet encoded.
+      </div>
     </div>
   );
 }

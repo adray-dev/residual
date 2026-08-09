@@ -165,16 +165,6 @@ export function Filters({
           </div>
         </div>
 
-        <div className={styles.group}>
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={state.scoredOnly}
-              onChange={(event) => set({ scoredOnly: event.target.checked })}
-            />
-            Scored parcels only
-          </label>
-        </div>
       </div>
 
       {note && <div className={styles.note}>{note}</div>}

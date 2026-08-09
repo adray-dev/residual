@@ -99,7 +99,6 @@ function chipsFor(state: FilterState, vocab: Vocabulary): { label: string; clear
   if (state.rlvMax != null) {
     chips.push({ label: `Value ≤ ${money(state.rlvMax, 1)}`, clear: { rlvMax: null } });
   }
-  if (state.scoredOnly) chips.push({ label: "Scored only", clear: { scoredOnly: false } });
   return chips;
 }
 
