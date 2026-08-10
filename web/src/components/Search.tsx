@@ -153,11 +153,13 @@ export function Search({
               />
               <span className={styles.resultText}>
                 <span className={styles.resultName}>{result.display_name}</span>
-                <span className={styles.resultMeta}>
-                  {[result.ward, result.neighborhood, vocab.status(result.status)]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
+                {/* Neighborhood only. Ward and the status word crowded the line under
+                    the name — three pieces of grey text competing with the one thing the
+                    user is actually reading, which is whether this is the parcel they
+                    typed. Status still travels, as the color of the dot. */}
+                {result.neighborhood && (
+                  <span className={styles.resultMeta}>{result.neighborhood}</span>
+                )}
               </span>
             </button>
           ))}

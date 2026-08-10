@@ -22,9 +22,10 @@ from engine.confidence import score_confidence
 from engine.envelope import resolve_envelope
 from engine.program import fit_program
 from engine.proforma import full_cashflow, screening_rlv
-from engine.prototypes import PROTOTYPES
+from engine.prototypes import DISABLED_PROTOTYPES, PROTOTYPES
 from engine.solve import solve_irr_rlv
 from engine.types import Assumptions, NotPermitted, Parcel, Use
+from api import vocabulary as vocab
 from data import repositories as repo
 
 UNDERWRITE_USE = Use.RESIDENTIAL
@@ -161,6 +162,16 @@ def underwrite(
     if prototype_id is None:
         best = next((r for r in baked if r.get("is_best") and r["status"] == "scored"), None)
         prototype_id = best["prototype_id"] if best else None
+    # A benched prototype (§5 `DISABLED_PROTOTYPES`) is refused by name rather than folded
+    # into "no admissible prototype": it IS defined and it MIGHT fit, it simply is not part
+    # of v1's product set, and saying so is the difference between a zoning answer and a
+    # product decision. Reachable two ways — a hand-built request, or an old saved link to a
+    # parcel whose previous-batch best was garden.
+    if prototype_id in DISABLED_PROTOTYPES:
+        raise UnderwriteError(
+            f"{vocab.prototype_label(prototype_id)} is defined but not part of the v1 "
+            f"product set, so it is not underwritten. Pick another build."
+        )
     if prototype_id is None or prototype_id not in PROTOTYPES:
         raise UnderwriteError("No admissible prototype for this parcel under its zoning.")
 
@@ -189,8 +200,13 @@ def underwrite(
             envelope, PROTOTYPES[prototype_id], rules, UNDERWRITE_USE, assumptions, parcel
         )
     except NotPermitted as exc:
+        # `humanize` translates the engine's prototype ids into the product's names, so a
+        # refusal reads "Multifamily is not admissible..." rather than naming a build type
+        # the interface does not use (§5.1).
         raise UnderwriteError(
-            f"{PROTOTYPES[prototype_id].prototype_id} is not admissible on this parcel: {exc}"
+            vocab.humanize(
+                f"{prototype_id} is not admissible on this parcel: {exc}"
+            )
         ) from exc
 
     # Tier 1, recomputed under the SAME inputs as tier 2 so the two are comparable. The

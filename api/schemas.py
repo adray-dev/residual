@@ -13,12 +13,20 @@ params is close enough to user-facing to honour it.
 from __future__ import annotations
 
 from datetime import datetime
+from math import isfinite
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Objective = Literal["rlv_total", "rlv_per_buildable_sf", "gap"]
 Status = Literal["scored", "infeasible", "exempt", "historic", "zone_not_encoded"]
+
+# The draw-an-area tool's bounds. The vertex cap is what keeps `ST_Intersects` cheap and
+# the request body bounded; `web/src/lib/drawRing.ts` mirrors it so the UI refuses first.
+MAX_DRAWN_VERTICES = 500
+# The DC parcel extent, padded ~0.03° (roughly 3 km) so a user can lasso past the district
+# line without being told off. Measured from `ST_Extent(parcel_geom)`, not guessed.
+DC_BBOX = (-77.15, 38.77, -76.88, 39.03)
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +145,46 @@ class MapFilters(BaseModel):
     # Levered IRR exists only in the full tier, so this filter runs the engine per parcel
     # and is bounded by `Limits.max_irr_filter_parcels` (see the router).
     irr_min: float | None = None
-    # GeoJSON Polygon ring(s) from the draw-an-area tool. Not wired in the UI this stage.
+    # A GeoJSON Polygon from the draw-an-area tool, validated below before it can reach
+    # PostGIS. A malformed ring must be a 422 with a sentence, never a 500 out of the
+    # geometry parser.
     drawn_polygon: dict | None = None
+
+    @field_validator("drawn_polygon")
+    @classmethod
+    def _check_polygon(cls, value: dict | None) -> dict | None:
+        if value is None:
+            return None
+        if value.get("type") != "Polygon":
+            raise ValueError("drawn_polygon must be a GeoJSON Polygon")
+        rings = value.get("coordinates")
+        if not isinstance(rings, list) or len(rings) != 1:
+            raise ValueError("drawn_polygon must have exactly one ring and no holes")
+        ring = rings[0]
+        if not isinstance(ring, list) or len(ring) < 4:
+            raise ValueError("A drawn area needs at least three corners")
+        # The cap is what keeps ST_Intersects cheap and the request body bounded. It is
+        # mirrored in the client so the UI refuses before the request does.
+        if len(ring) > MAX_DRAWN_VERTICES + 1:
+            raise ValueError(
+                f"A drawn area can have at most {MAX_DRAWN_VERTICES} corners"
+            )
+        for position in ring:
+            if (
+                not isinstance(position, (list, tuple))
+                or len(position) < 2
+                or not all(isinstance(c, (int, float)) and isfinite(c) for c in position[:2])
+            ):
+                raise ValueError("drawn_polygon has a malformed coordinate")
+            lon, lat = float(position[0]), float(position[1])
+            # Outside DC there is nothing to select, and an unbounded ring is a way to ask
+            # PostGIS to scan the whole table. Padded a little, since a user can reasonably
+            # lasso past the district line.
+            if not (DC_BBOX[0] <= lon <= DC_BBOX[2] and DC_BBOX[1] <= lat <= DC_BBOX[3]):
+                raise ValueError("The drawn area falls outside Washington DC")
+        if ring[0][:2] != ring[-1][:2]:
+            raise ValueError("drawn_polygon's ring must be closed (first position repeated)")
+        return value
 
 
 class MapQueryRequest(BaseModel):
@@ -149,6 +195,9 @@ class MapQueryRequest(BaseModel):
     sort_dir: Literal["asc", "desc"] = "desc"
     limit: int = 200
     offset: int = 0
+    # Aggregates over the whole matching set. Opt-in, because it is a second pass over the
+    # same WHERE and only the drawn-area strip needs it.
+    include_totals: bool = False
 
 
 class ParcelRow(BaseModel):
@@ -196,6 +245,21 @@ class ParcelRow(BaseModel):
     irr: float | None = None
 
 
+class MapTotals(BaseModel):
+    """Sums over the whole matching set, for the drawn-area strip.
+
+    Sums over parcels underwritten INDEPENDENTLY. Not an assemblage: combining adjacent lots
+    changes the lot area, which changes which prototype fits, which changes the answer. The
+    UI carries that caveat wherever it shows these.
+    """
+    parcels: int
+    lot_area_sf: float | None
+    buildable_sf: float | None
+    units: int | None
+    rlv_total: float | None
+    median_rlv_per_buildable_sf: float | None
+
+
 class MapQueryResponse(BaseModel):
     computed_at: datetime
     total: int = Field(description="Matching parcels before paging")
@@ -206,6 +270,9 @@ class MapQueryResponse(BaseModel):
     sort_dir: str
     rows: list[ParcelRow]
     irr_filter_applied: bool = False
+    totals: MapTotals | None = Field(
+        None, description="Present only when the request asked for it"
+    )
 
 
 # ---------------------------------------------------------------------------

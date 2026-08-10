@@ -12,9 +12,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MapQuery, ParcelRow } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
-import { getMapQuery, NotModellable } from "../lib/api";
+import { NotModellable } from "../lib/api";
 import { count, money, percent } from "../lib/format";
-import { queryParams, type FilterState } from "../lib/filters";
+import { mapQuery, type FilterState } from "../lib/filters";
 import { MAX_COMPARE } from "../lib/compare";
 import styles from "./Table.module.css";
 
@@ -23,6 +23,10 @@ const PAGE_SIZE = 50;
 /** Chip color per build, from the map's own ramp so the table and the map agree. */
 const BUILD_TINT: Record<string, { bg: string; fg: string }> = {
   townhome: { bg: "#eaf2f1", fg: "#0a5250" },
+  // `5-over-1` and `midrise` are one product to the user ("Multifamily"), so they must be
+  // one chip — identical fill, identical text. A different tint behind the same word would
+  // leak the wood/concrete split that the label collapse exists to keep in the backend.
+  "5-over-1": { bg: "#fbf0e4", fg: "#8a5a21" },
   garden: { bg: "#e9eef4", fg: "#2d5473" },
   midrise: { bg: "#fbf0e4", fg: "#8a5a21" },
   highrise: { bg: "#f4f2ed", fg: "#3d3b37" },
@@ -48,10 +52,10 @@ function columnsFor(_vocab: Vocabulary): Column[] {
     // it is not in the bake — so the server bounds it and says so when the set is too big.
     { key: "irr", label: "IRR", sortKey: "irr", headline: true, render: (r) => percent(r.irr) },
     {
-      key: "yield_on_cost",
-      label: "Yield",
-      sortKey: "yield_on_cost",
-      render: (r) => percent(r.yield_on_cost),
+      key: "profit_margin",
+      label: "Margin",
+      sortKey: "profit_margin",
+      render: (r) => percent(r.profit_margin),
     },
     {
       key: "total_development_cost",
@@ -94,7 +98,22 @@ function chipsFor(state: FilterState, vocab: Vocabulary): { label: string; clear
   if (state.rlvMax != null) {
     chips.push({ label: `Value ≤ ${money(state.rlvMax, 1)}`, clear: { rlvMax: null } });
   }
+  if (state.drawnPolygon) {
+    chips.push({ label: "Drawn area", clear: { drawnPolygon: null } });
+  }
   return chips;
+}
+
+/** One figure in the drawn-area strip. */
+function Total({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <span className={styles.total}>
+      <span className="micro-label">{label}</span>
+      <span className={`${styles.totalValue} ${strong ? styles.totalStrong : ""}`}>
+        {value}
+      </span>
+    </span>
+  );
 }
 
 export function Table({
@@ -131,14 +150,18 @@ export function Table({
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
-    getMapQuery(
+    mapQuery(
+      filters,
       {
-        ...queryParams(filters),
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
-        sort_key: sortKey,
-        sort_dir: sortDir,
-        with_returns: "true",
+        sortKey,
+        sortDir,
+        withReturns: true,
+        // Only for a drawn area. Elsewhere the set is "everything matching the pane",
+        // which the count above already states, and a second pass over 79,073 rows to
+        // restate it would be paid on every sort.
+        includeTotals: filters.drawnPolygon != null,
       },
       controller.signal,
     )
@@ -250,6 +273,32 @@ export function Table({
           </span>
         ))}
       </div>
+
+      {data?.totals && filters.drawnPolygon && (
+        <div className={styles.totals}>
+          <Total label="Lot area" value={`${count(data.totals.lot_area_sf ?? 0)} SF`} />
+          <Total
+            label={vocab.metric("gross_sf")}
+            value={`${count(data.totals.buildable_sf ?? 0)} SF`}
+          />
+          <Total label={vocab.metric("unit_count")} value={count(data.totals.units ?? 0)} />
+          <Total
+            label={vocab.metric("rlv_total")}
+            value={money(data.totals.rlv_total ?? 0)}
+            strong
+          />
+          <Total
+            label={`Median ${vocab.metric("rlv_per_buildable_sf").toLowerCase()}`}
+            value={money(data.totals.median_rlv_per_buildable_sf ?? 0)}
+          />
+          {/* The caveat is not a footnote. Five adjacent lots underwritten together would
+              have a different lot area, which would admit a different prototype, which
+              would give a different answer — these are sums, not a site. */}
+          <span className={styles.caveat}>
+            Sums of parcels underwritten separately, not a combined site
+          </span>
+        </div>
+      )}
 
       <div className={styles.scroll}>
         <div className={`${styles.row} ${styles.header}`}>

@@ -17,18 +17,24 @@
 import { useEffect, useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
-import { getMapQuery, NotModellable } from "../lib/api";
-import { count, money } from "../lib/format";
-import { EMPTY_FILTERS, isEmpty, queryParams, toggle, type FilterState } from "../lib/filters";
+import { NotModellable } from "../lib/api";
+import { money } from "../lib/format";
+import { EMPTY_FILTERS, isEmpty, mapQuery, toggle, type FilterState } from "../lib/filters";
 import styles from "./Filters.module.css";
 
-/** The four SPEC prototypes, smallest build to largest. */
-const PROTOTYPES = ["townhome", "garden", "midrise", "highrise"];
-
-/** Upper bounds for the program sliders, from what the bake actually contains. */
-const UNITS_CEILING = 1200;
-const FLOORS_CEILING = 14;
-const BUILDING_SF_CEILING = 400_000;
+/** The build-type filter, as the USER's three products — smallest to largest.
+ *
+ * Each entry is the list of engine prototypes that product covers, because the engine has
+ * four and the interface shows three: `5-over-1` and `midrise` are both "Multifamily",
+ * separated in the model only so 4-7 storeys can be priced as the wood it is built from.
+ * One checkbox therefore selects both ids, and the label comes from the first — /meta maps
+ * both to the same string, so which one is asked is immaterial.
+ *
+ * Garden is absent: defined in `engine/prototypes.py` but benched (§5), so a chip for it
+ * would always return zero. Its LABEL still exists server-side, because the retained
+ * previous batch has garden winners whose rows must render a name.
+ */
+const BUILD_TYPES: string[][] = [["townhome"], ["5-over-1", "midrise"], ["highrise"]];
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -39,59 +45,70 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** A named min/max pair. Each handle clamps AT the other rather than pushing it. */
-function Range({
+/** A typed min/max pair.
+ *
+ * Boxes rather than sliders, for every program range: units, stories and building area are
+ * values a user arrives with ("I want 50 to 200 units"), not values they discover by
+ * dragging. A slider makes an exact number the hardest thing to enter, and these three
+ * span 0–1,200, 0–14 and 0–400,000, so the same drag distance means wildly different
+ * precision in each. Only the feasibility-value filter is still a slider, because that one
+ * genuinely is a "how far along the distribution" question.
+ *
+ * A box also has no ceiling to invent. The slider's upper bound was whatever the current
+ * bake happened to top out at, which quietly made "everything above 400,000 SF" unaskable.
+ *
+ * Empty means unbounded, which is why the state is `number | null` and not a sentinel.
+ */
+function NumberRange({
   min,
   max,
-  ceiling,
-  step,
-  format,
+  step = 1,
+  unit,
   onChange,
 }: {
   min: number | null;
   max: number | null;
-  ceiling: number;
-  step: number;
-  format: (value: number) => string;
+  step?: number;
+  unit?: string;
   onChange: (next: { min?: number | null; max?: number | null }) => void;
 }) {
+  // Raw text, so a half-typed value is not coerced mid-keystroke and clearing a box does
+  // not immediately snap back to a bound.
+  const [draft, setDraft] = useState<{ min?: string; max?: string }>({});
+
+  const commit = (which: "min" | "max", text: string) => {
+    setDraft((d) => ({ ...d, [which]: text }));
+    if (text.trim() === "") {
+      onChange({ [which]: null });
+      return;
+    }
+    const value = Number(text);
+    if (Number.isFinite(value) && value >= 0) onChange({ [which]: value });
+  };
+
+  const box = (which: "min" | "max", value: number | null, placeholder: string) => (
+    <span className={styles.numberWrap}>
+      <input
+        className={styles.numberInput}
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={step}
+        placeholder={placeholder}
+        aria-label={`${which === "min" ? "Minimum" : "Maximum"} ${unit ?? "value"}`}
+        value={draft[which] ?? (value == null ? "" : String(value))}
+        onChange={(event) => commit(which, event.target.value)}
+      />
+    </span>
+  );
+
   return (
-    <>
-      <div className={styles.sliderRow}>
-        <span className={styles.sliderLabel}>Min</span>
-        <input
-          className={styles.slider}
-          type="range"
-          min={0}
-          max={ceiling}
-          step={step}
-          value={min ?? 0}
-          onChange={(event) => {
-            const value = Math.min(Number(event.target.value), max ?? ceiling);
-            onChange({ min: value <= 0 ? null : value });
-          }}
-        />
-        <span className={styles.sliderValue}>{format(min ?? 0)}</span>
-      </div>
-      <div className={styles.sliderRow}>
-        <span className={styles.sliderLabel}>Max</span>
-        <input
-          className={styles.slider}
-          type="range"
-          min={0}
-          max={ceiling}
-          step={step}
-          value={max ?? ceiling}
-          onChange={(event) => {
-            const value = Math.max(Number(event.target.value), min ?? 0);
-            onChange({ max: value >= ceiling ? null : value });
-          }}
-        />
-        <span className={styles.sliderValue}>
-          {max == null ? `${format(ceiling)}+` : format(max)}
-        </span>
-      </div>
-    </>
+    <div className={styles.numberRow}>
+      {box("min", min, "Min")}
+      <span className={styles.numberDash}>–</span>
+      {box("max", max, "Max")}
+      {unit && <span className={styles.numberUnit}>{unit}</span>}
+    </div>
   );
 }
 
@@ -118,12 +135,12 @@ export function Filters({
   const step = Math.max(1, Math.round((ceiling - floor) / 200));
 
   useEffect(() => {
-    // Debounced: dragging a slider fires this on every tick otherwise, and each one counts
-    // across 132k rows.
+    // Debounced: dragging the value slider fires this on every tick otherwise, and a
+    // typed box fires on every keystroke. Each one counts across 132k rows.
     setStale(true);
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      getMapQuery(queryParams(state), controller.signal)
+      mapQuery(state, {}, controller.signal)
         .then((response) => {
           setMatched(response.total);
           setNote(null);
@@ -158,6 +175,27 @@ export function Filters({
       <div className={styles.rule} />
 
       <div className={styles.body}>
+        {/* Only present once there is one. A drawn area is made on the map, not here — but
+            it is a filter, so it has to be visible where the filters are, or Reset clearing
+            it comes out of nowhere. */}
+        {state.drawnPolygon && (
+          <Group label="Drawn area">
+            <div className={styles.areaRow}>
+              <span className={styles.areaText}>
+                {state.drawnPolygon.coordinates[0]
+                  ? `${state.drawnPolygon.coordinates[0].length - 1} corners`
+                  : "Custom shape"}
+              </span>
+              <button
+                className={styles.areaClear}
+                onClick={() => set({ drawnPolygon: null })}
+              >
+                Clear
+              </button>
+            </div>
+          </Group>
+        )}
+
         <Group label="Geography">
           <div className={styles.chips}>
             {meta.submarkets.map((submarket) => (
@@ -213,26 +251,36 @@ export function Filters({
 
         <Group label={vocab.metric("prototype_id")}>
           <div className={styles.checks}>
-            {PROTOTYPES.map((prototype) => (
-              <label className={styles.check} key={prototype}>
-                <input
-                  type="checkbox"
-                  checked={state.prototypes.includes(prototype)}
-                  onChange={() => set({ prototypes: toggle(state.prototypes, prototype) })}
-                />
-                {vocab.prototype(prototype)}
-              </label>
-            ))}
+            {BUILD_TYPES.map((ids) => {
+              // Checked when the group is fully selected; toggling adds or removes the
+              // whole group, so a half-selected "Multifamily" is not reachable from here.
+              const on = ids.every((id) => state.prototypes.includes(id));
+              return (
+                <label className={styles.check} key={ids.join()}>
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() =>
+                      set({
+                        prototypes: on
+                          ? state.prototypes.filter((p) => !ids.includes(p))
+                          : [...state.prototypes, ...ids.filter((id) => !state.prototypes.includes(id))],
+                      })
+                    }
+                  />
+                  {vocab.prototype(ids[0])}
+                </label>
+              );
+            })}
           </div>
         </Group>
 
         <Group label="Units">
-          <Range
+          <NumberRange
             min={state.unitsMin}
             max={state.unitsMax}
-            ceiling={UNITS_CEILING}
             step={5}
-            format={(v) => count(v)}
+            unit="units"
             onChange={(patch) =>
               set({
                 ...(patch.min !== undefined ? { unitsMin: patch.min } : {}),
@@ -243,12 +291,10 @@ export function Filters({
         </Group>
 
         <Group label="Stories">
-          <Range
+          <NumberRange
             min={state.floorsMin}
             max={state.floorsMax}
-            ceiling={FLOORS_CEILING}
-            step={1}
-            format={(v) => String(v)}
+            unit="floors"
             onChange={(patch) =>
               set({
                 ...(patch.min !== undefined ? { floorsMin: patch.min } : {}),
@@ -276,12 +322,11 @@ export function Filters({
           </label>
           {!state.vacantOnly && (
             <div className={styles.subRange}>
-              <Range
+              <NumberRange
                 min={state.buildingSfMin}
                 max={state.buildingSfMax}
-                ceiling={BUILDING_SF_CEILING}
                 step={1000}
-                format={(v) => `${count(v)} SF`}
+                unit="SF"
                 onChange={(patch) =>
                   set({
                     ...(patch.min !== undefined ? { buildingSfMin: patch.min } : {}),

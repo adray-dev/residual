@@ -367,3 +367,43 @@
   color: var(--ink-40);
   font-size: 13px;
 }
+
+/* --- drawn-area totals ----------------------------------------------------- */
+/* Above the rows, because it describes the whole set while the rows are one page of it.
+   Only ever present for a drawn area — for the pane's filters the parcel count already
+   says what the set is. */
+.totals {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 11px 20px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--hairline-strong);
+  overflow-x: auto;
+}
+
+.total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.totalValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.totalStrong {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.caveat {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-25);
+  white-space: nowrap;
+}

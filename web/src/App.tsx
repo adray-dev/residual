@@ -38,9 +38,11 @@ import type {
 import { changeCount, type Overrides } from "./lib/assumptions";
 import { InputsModal } from "./components/InputsModal";
 import { Vocabulary } from "./lib/vocabulary";
-import { EMPTY_FILTERS, mapFilter, type FilterState } from "./lib/filters";
+import { EMPTY_FILTERS, mapFilter, mapQuery, type FilterState } from "./lib/filters";
+import type { Ring } from "./lib/drawRing";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
 import { Filters } from "./components/Filters";
+import { DrawControl } from "./components/DrawControl";
 import { ResidualMark } from "./components/ResidualMark";
 import { Legend } from "./components/Legend";
 import { MapView } from "./components/MapView";
@@ -98,6 +100,12 @@ export function App() {
   const [listBusy, setListBusy] = useState(false);
   const [memberOf, setMemberOf] = useState<string[]>([]);
   const [tableOpen, setTableOpen] = useState(false);
+  // The draw-an-area gesture. `drawing` is the mode; the committed ring lives in
+  // `filters.drawnPolygon`, because once closed it is a filter like any other and must
+  // reset, count and query through the same path as the rest of the pane.
+  const [drawing, setDrawing] = useState(false);
+  const [drawCorners, setDrawCorners] = useState(0);
+  const [areaCount, setAreaCount] = useState<number | null>(null);
   /** Where the map should fly to, set by a search pick. */
   const [flyTo, setFlyTo] = useState<{ lon: number; lat: number; parcelId: string } | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -119,6 +127,40 @@ export function App() {
       live = false;
     };
   }, []);
+
+  /** A closed ring. It becomes a filter, and the table opens on it — drawing an area is
+   * an act of asking what is inside, so the answer should not need a second click. */
+  const completeDraw = useCallback((ring: Ring) => {
+    setDrawing(false);
+    setDrawCorners(0);
+    setAreaCount(null);
+    setFilters((current) => ({ ...current, drawnPolygon: ring }));
+    setTableOpen(true);
+  }, []);
+
+  const clearDraw = useCallback(() => {
+    setDrawing(false);
+    setDrawCorners(0);
+    setAreaCount(null);
+    setFilters((current) => ({ ...current, drawnPolygon: null }));
+  }, []);
+
+  // The count for the drawn area, which the strip reports. Its own request rather than a
+  // read of the pane's, because the pane counts every filter together and the strip is
+  // making the narrower claim: how many parcels the AREA holds.
+  useEffect(() => {
+    const ring = filters.drawnPolygon;
+    if (!ring) {
+      setAreaCount(null);
+      return;
+    }
+    const controller = new AbortController();
+    setAreaCount(null);
+    mapQuery({ ...EMPTY_FILTERS, drawnPolygon: ring }, {}, controller.signal)
+      .then((response) => setAreaCount(response.total))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [filters.drawnPolygon]);
 
   /** Map click: show the popup immediately, fill in the record when it lands. */
   const select = useCallback((parcelId: string, at: { x: number; y: number }) => {
@@ -425,6 +467,14 @@ export function App() {
               flyTo={flyTo}
               onSelect={select}
               onSelectNothing={dismiss}
+              drawing={drawing}
+              drawnPolygon={filters.drawnPolygon}
+              onDrawComplete={completeDraw}
+              onDrawCancel={() => {
+                setDrawing(false);
+                setDrawCorners(0);
+              }}
+              onDrawProgress={setDrawCorners}
             />
           ) : (
             // /meta returns null rather than a stale tileset when tiles have not been
@@ -447,6 +497,27 @@ export function App() {
               vocab={vocab}
               objective={objective}
               onObjectiveChange={setObjective}
+            />
+          )}
+
+          {meta?.tileset_url && (
+            <DrawControl
+              drawing={drawing}
+              corners={drawCorners}
+              hasArea={filters.drawnPolygon != null}
+              matched={areaCount}
+              onStart={() => {
+                setDrawing(true);
+                setDrawCorners(0);
+                // The popup is anchored to a screen position that the next click is about
+                // to stop meaning, and a card over the map is in the way of drawing.
+                dismiss();
+              }}
+              onCancel={() => {
+                setDrawing(false);
+                setDrawCorners(0);
+              }}
+              onClear={clearDraw}
             />
           )}
 

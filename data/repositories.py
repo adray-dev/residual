@@ -15,7 +15,7 @@ import psycopg
 from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
-from engine.prototypes import PROTOTYPES
+from engine.prototypes import DISABLED_PROTOTYPES, PROTOTYPES
 from engine.types import (
     Assumptions,
     ConstructionType,
@@ -328,9 +328,20 @@ def get_all_markets(conn, as_of: str | None = None) -> dict[str, MarketData]:
 
 
 def get_prototypes(conn) -> list[Prototype]:
+    """The prototypes that COMPETE, in a stable order.
+
+    Filtered by `DISABLED_PROTOTYPES` (§5), not by the query: the table keeps a row for
+    every prototype in the library so a benched one stays inspectable and re-enabling is a
+    code change rather than a migration. This is the one read the bake ranks over, so
+    excluding here excludes from `is_best` everywhere.
+    """
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM prototypes ORDER BY prototype_id")
-        return [_to_prototype(r) for r in cur.fetchall()]
+        return [
+            _to_prototype(r)
+            for r in cur.fetchall()
+            if r["prototype_id"] not in DISABLED_PROTOTYPES
+        ]
 
 
 def get_default_assumption_set(conn) -> Assumptions | None:
@@ -516,6 +527,24 @@ _MAP_SELECT = """
 """
 
 
+def polygon_wkt(polygon: Mapping[str, Any]) -> str:
+    """A validated GeoJSON Polygon as WKT, for `ST_GeomFromText`.
+
+    Not `ST_GeomFromGeoJSON`, which is the obvious call and does not work here: Homebrew's
+    PostGIS is built without JSON-C, so it raises "You need JSON-C for ST_GeomFromGeoJSON"
+    on every input. Even where it is available it returns SRID 0, which then fails against
+    a GEOMETRY(MultiPolygon, 4326) column with a mixed-SRID error — hence the explicit
+    ST_SetSRID at the call site.
+
+    Shape, vertex count, closure and the DC bounding box are already enforced by
+    `MapFilters._check_polygon`, so a bad ring is a 422 long before it reaches here. This
+    only formats.
+    """
+    ring = polygon["coordinates"][0]
+    positions = ", ".join(f"{float(lon)!r} {float(lat)!r}" for lon, lat, *_ in ring)
+    return f"POLYGON(({positions}))"
+
+
 def _map_where(
     computed_at: datetime | None,
     bounds: tuple[float, float, float, float] | None,
@@ -530,9 +559,10 @@ def _map_where(
         params.extend(bounds)
     if filters.get("drawn_polygon"):
         # ST_Intersects, not &&: a drawn area is an explicit selection, so it should mean
-        # the shape rather than the shape's bounding box.
-        where.append("ST_Intersects(p.parcel_geom, ST_GeomFromGeoJSON(%s))")
-        params.append(json.dumps(filters["drawn_polygon"]))
+        # the shape rather than the shape's bounding box. The index is still used —
+        # ST_Intersects applies the && bbox test internally before the exact one.
+        where.append("ST_Intersects(p.parcel_geom, ST_SetSRID(ST_GeomFromText(%s), 4326))")
+        params.append(polygon_wkt(filters["drawn_polygon"]))
     if filters.get("statuses"):
         where.append("b.status = ANY(%s)")
         params.append(list(filters["statuses"]))
@@ -615,6 +645,45 @@ def map_query(
             [*params, limit, offset],
         )
         return cur.fetchall(), total
+
+
+def map_totals(
+    conn,
+    computed_at: datetime | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
+    filters: Mapping[str, Any] | None = None,
+) -> dict:
+    """Aggregates over the whole matching set, for the drawn-area strip.
+
+    Reuses `_map_where`, so the totals describe exactly the set the table is paging through
+    — computing them from a page would be a different number wearing the same label.
+
+    SPEC §9's read-path rule holds: this sorts and sums, it never divides to invent a
+    metric. The median is `percentile_cont` over a stored column, not a ratio of two sums.
+
+    The figures are sums over INDEPENDENT parcels. They are not an assemblage: five adjacent
+    lots underwritten together would unlock a different prototype and a different RLV, and
+    nothing here models that. The UI says so where it shows them.
+    """
+    filters = filters or {}
+    where, params = _map_where(computed_at, bounds, filters)
+    clause = " AND ".join(where)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT count(*)                    AS parcels,
+                       SUM(p.lot_area_sf)          AS lot_area_sf,
+                       SUM(b.gross_sf)             AS buildable_sf,
+                       SUM(b.unit_count)           AS units,
+                       SUM(b.rlv_total)            AS rlv_total,
+                       percentile_cont(0.5) WITHIN GROUP (
+                           ORDER BY b.rlv_per_buildable_sf
+                       )                           AS median_rlv_per_buildable_sf
+                FROM bake_results b JOIN parcels p USING (ssl)
+                WHERE {clause}""",
+            params,
+        )
+        return cur.fetchone()
 
 
 def objective_ramp(

@@ -78,9 +78,9 @@ function Card({
           </span>
         </div>
         <div className={styles.metric}>
-          <span className="micro-label">Yield</span>
+          <span className="micro-label">Margin</span>
           <span className={`${styles.metricValue} ${styles.plain}`}>
-            {percent(parcel.yield_on_cost)}
+            {percent(parcel.profit_margin)}
           </span>
         </div>
       </div>

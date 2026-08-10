@@ -207,3 +207,16 @@ export function hatchImage(size = 6): ImageData {
 
   return ctx.getImageData(0, 0, size, size);
 }
+
+/** The draw-an-area tool's ink.
+ *
+ * The accent, the same teal the active-state UI uses, so a drawn area reads as something
+ * the user made rather than as another data layer. Kept out of the value ramp's hues on
+ * purpose — a drawn outline must never be mistaken for a feasibility color.
+ */
+export const DRAW_ACCENT = "#0e7c7b";
+/** The veil over everything outside a drawn area. Canvas, and slightly heavier than the
+ * filter dim (0.76) — an explicit selection should read as a stronger narrowing than a
+ * slider does. */
+export const DRAW_MASK_COLOR = "#f4f2ed";
+export const DRAW_MASK_OPACITY = 0.82;

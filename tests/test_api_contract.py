@@ -431,3 +431,82 @@ def test_search_never_says_ssl(client):
 def test_an_empty_search_returns_nothing_rather_than_everything(client):
     assert client.get("/parcels/search", params={"q": ""}).json()["results"] == []
     assert client.get("/parcels/search", params={"q": "   "}).json()["results"] == []
+
+
+# ---------------------------------------------------------------------------
+# §5.1: the engine's build-type ids never reach a user.
+# ---------------------------------------------------------------------------
+FORBIDDEN_IN_UI = "5-over-1"
+
+
+def test_meta_labels_never_expose_the_engine_build_id(meta):
+    """Both wood and concrete multifamily must render as one name.
+
+    The label block is what every surface reads, so if `5-over-1` survives here it survives
+    into the popup, the table, the drill-down, compare and both exports at once.
+    """
+    labels = meta["labels"]["prototype"]
+    assert labels["5-over-1"] == "Multifamily"
+    assert labels["midrise"] == "Multifamily"
+    assert FORBIDDEN_IN_UI not in labels.values()
+    # Three names over the four prototypes that compete.
+    assert {v for k, v in labels.items() if k != "garden"} == {
+        "Townhome", "Multifamily", "High-rise",
+    }
+
+
+def test_a_refusal_names_the_product_not_the_prototype(client):
+    """`engine/` is pure and raises "5-over-1 requires >= 6,000 SF lot" — correct for a log
+    and wrong for a user. The API boundary translates it; this pins that it still does."""
+    from api import vocabulary as vocab
+
+    engine_message = "5-over-1 requires >= 6,000 SF lot; parcel is 4,000 SF"
+    assert vocab.humanize(engine_message) == (
+        "Multifamily requires >= 6,000 SF lot; parcel is 4,000 SF"
+    )
+    assert FORBIDDEN_IN_UI not in vocab.humanize(engine_message)
+
+    # A real refusal, end to end: ask for a build the parcel cannot take and read the 422.
+    rows = client.get(
+        "/map/query", params={"statuses": ["scored"], "limit": 40}
+    ).json()["rows"]
+    for row in rows:
+        response = client.get(
+            f"/parcel/{row['parcel_id'].replace(' ', '%20')}/underwrite",
+            params={"prototype_id": "5-over-1"},
+        )
+        if response.status_code == 422:
+            assert FORBIDDEN_IN_UI not in response.text, response.text
+            assert "Multifamily" in response.json()["detail"]
+            break
+
+
+def test_no_endpoint_leaks_the_engine_build_id_in_prose(client, scored_parcel_id):
+    """Sweep the read endpoints. Wire FIELDS may carry the id — SPEC's convention is that
+    payload keys and values are the engine's — but no human-readable string may."""
+    import json
+
+    def prose(node):
+        """Every display string in a payload, ignoring the raw `prototype_id` field."""
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in {"prototype_id", "best_prototype_id"}:
+                    continue
+                yield from prose(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from prose(item)
+        elif isinstance(node, str):
+            yield node
+
+    encoded = scored_parcel_id.replace(" ", "%20")
+    for path in (
+        "/meta",
+        f"/parcel/{encoded}",
+        f"/parcel/{encoded}/underwrite",
+        "/map/query?statuses=scored&limit=25&with_returns=true",
+    ):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        offenders = [s for s in prose(response.json()) if FORBIDDEN_IN_UI in s]
+        assert not offenders, f"{path} leaked: {json.dumps(offenders[:3])}"

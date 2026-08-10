@@ -10,6 +10,9 @@
  * expression and the query string are built here, side by side, from the same fields.
  */
 import type { ExpressionSpecification, FilterSpecification } from "maplibre-gl";
+import type { MapQuery } from "./types";
+import { getMapQuery, postMapQuery } from "./api";
+import type { Ring } from "./drawRing";
 import { BIN_FIELD } from "./mapStyle";
 
 export interface FilterState {
@@ -29,6 +32,14 @@ export interface FilterState {
   buildingSfMax: number | null;
   /** Nothing standing. Mutually informative with the building-area range, not exclusive. */
   vacantOnly: boolean;
+  /** The draw-an-area ring. Null means the whole city.
+   *
+   * The one filter with no tile attribute behind it, and necessarily so: point-in-polygon
+   * is not expressible as a MapLibre expression. It is therefore absent from `mapFilter`
+   * and the map narrows for it geometrically instead, via the mask in `MapView`. Membership
+   * is decided server-side by `ST_Intersects` on real parcel geometry.
+   */
+  drawnPolygon: Ring | null;
 }
 
 // IRR is deliberately NOT a filter. It is absent from the tile — levered IRR is not in the
@@ -48,6 +59,7 @@ export const EMPTY_FILTERS: FilterState = {
   buildingSfMin: null,
   buildingSfMax: null,
   vacantOnly: false,
+  drawnPolygon: null,
 };
 
 export function isEmpty(state: FilterState): boolean {
@@ -62,7 +74,8 @@ export function isEmpty(state: FilterState): boolean {
     state.floorsMax == null &&
     state.buildingSfMin == null &&
     state.buildingSfMax == null &&
-    !state.vacantOnly
+    !state.vacantOnly &&
+    state.drawnPolygon == null
   );
 }
 
@@ -125,26 +138,94 @@ export function mapFilter(state: FilterState): FilterSpecification | null {
   return ["all", ...clauses] as FilterSpecification;
 }
 
-/** The same state as /map/query parameters, for the "N parcels match" count. */
-export function queryParams(state: FilterState): Record<string, string | number | string[]> {
-  const params: Record<string, string | number | string[]> = {
-    // One row is enough: the count comes from `total`, which is computed before paging.
-    limit: 1,
+/** How the server names these filters. One object, two encodings below, so the GET and
+ * POST forms cannot drift — and they must not, because the count and the table would then
+ * quietly disagree about what is being counted. */
+function serverFilters(state: FilterState): Record<string, unknown> {
+  const filters: Record<string, unknown> = {
     // Always. The read path has the same premise as the map.
     statuses: ["scored"],
   };
-  if (state.wards.length) params.wards = state.wards;
-  if (state.prototypes.length) params.prototypes = state.prototypes;
-  if (state.rlvMin != null) params.rlv_min = state.rlvMin;
-  if (state.rlvMax != null) params.rlv_max = state.rlvMax;
-  if (state.unitsMin != null) params.units_min = state.unitsMin;
-  if (state.unitsMax != null) params.units_max = state.unitsMax;
-  if (state.floorsMin != null) params.floors_min = state.floorsMin;
-  if (state.floorsMax != null) params.floors_max = state.floorsMax;
-  if (state.buildingSfMin != null) params.building_sf_min = state.buildingSfMin;
-  if (state.buildingSfMax != null) params.building_sf_max = state.buildingSfMax;
-  if (state.vacantOnly) params.vacant_only = "true";
+  if (state.wards.length) filters.wards = state.wards;
+  if (state.prototypes.length) filters.prototypes = state.prototypes;
+  if (state.rlvMin != null) filters.rlv_min = state.rlvMin;
+  if (state.rlvMax != null) filters.rlv_max = state.rlvMax;
+  if (state.unitsMin != null) filters.units_min = state.unitsMin;
+  if (state.unitsMax != null) filters.units_max = state.unitsMax;
+  if (state.floorsMin != null) filters.floors_min = state.floorsMin;
+  if (state.floorsMax != null) filters.floors_max = state.floorsMax;
+  if (state.buildingSfMin != null) filters.building_sf_min = state.buildingSfMin;
+  if (state.buildingSfMax != null) filters.building_sf_max = state.buildingSfMax;
+  if (state.vacantOnly) filters.vacant_only = true;
+  if (state.drawnPolygon) filters.drawn_polygon = state.drawnPolygon;
+  return filters;
+}
+
+/** Paging and sort. Separate from the filters because they describe the request, not the
+ * set — and because the POST form carries them in the body while `with_returns` stays in
+ * the query string, which is a distinction worth having in one place only. */
+export interface MapQueryOptions {
+  limit?: number;
+  offset?: number;
+  sortKey?: string;
+  sortDir?: "asc" | "desc";
+  withReturns?: boolean;
+  /** Aggregates over the whole matching set. POST only — the GET form has no such
+   * parameter, and the only caller that wants totals is the drawn-area strip, which is
+   * on the POST path by definition. */
+  includeTotals?: boolean;
+}
+
+/** The GET encoding, per SPEC section 10's `GET /map/query?bounds&filters`. */
+export function queryParams(
+  state: FilterState,
+  options: MapQueryOptions = {},
+): Record<string, string | number | string[]> {
+  const params: Record<string, string | number | string[]> = {
+    // One row is enough for a count: `total` is computed before paging.
+    limit: options.limit ?? 1,
+  };
+  for (const [key, value] of Object.entries(serverFilters(state))) {
+    if (key === "drawn_polygon") continue; // cannot be a query parameter — see mapQuery
+    params[key] = Array.isArray(value)
+      ? (value as string[])
+      : (value as string | number | boolean).toString();
+  }
+  if (options.offset) params.offset = options.offset;
+  if (options.sortKey) params.sort_key = options.sortKey;
+  if (options.sortDir) params.sort_dir = options.sortDir;
+  if (options.withReturns) params.with_returns = "true";
   return params;
+}
+
+/** The POST encoding. Required once a drawn area is in play. */
+export function queryBody(state: FilterState, options: MapQueryOptions = {}): unknown {
+  return {
+    filters: serverFilters(state),
+    limit: options.limit ?? 1,
+    offset: options.offset ?? 0,
+    ...(options.sortKey ? { sort_key: options.sortKey } : {}),
+    ...(options.sortDir ? { sort_dir: options.sortDir } : {}),
+    ...(options.includeTotals ? { include_totals: true } : {}),
+  };
+}
+
+/** Run the read, picking the verb.
+ *
+ * GET while there is no drawn area, because a URL is inspectable and cacheable and that is
+ * worth keeping for the ordinary case. POST once there is one, because a ring is hundreds
+ * of coordinates. Both callers — the count in the pane and the table — go through here, so
+ * neither can end up on the wrong verb and silently drop the polygon.
+ */
+export function mapQuery(
+  state: FilterState,
+  options: MapQueryOptions = {},
+  signal?: AbortSignal,
+): Promise<MapQuery> {
+  if (state.drawnPolygon) {
+    return postMapQuery(queryBody(state, options), options.withReturns ?? false, signal);
+  }
+  return getMapQuery(queryParams(state, options), signal);
 }
 
 /** Objectives whose ramp we can read a slider domain from. */

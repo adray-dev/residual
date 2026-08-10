@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api import serializers as ser
 from api.deps import current_batch, get_conn
-from api.schemas import Bounds, MapFilters, MapQueryRequest, MapQueryResponse
+from api.schemas import Bounds, MapFilters, MapQueryRequest, MapQueryResponse, MapTotals
 from api.settings import settings
 from api.underwrite import irr_for_row
 from data import repositories as repo
@@ -48,6 +48,20 @@ def _run(
         sort_dir=req.sort_dir,
         limit=limit,
         offset=req.offset,
+    )
+
+    # Aggregates over the whole matching set, not the page. Asked for only by the
+    # drawn-area strip, and skipped entirely otherwise — it is a second pass over the
+    # same WHERE.
+    totals = (
+        MapTotals(**repo.map_totals(
+            conn,
+            computed_at=batch,
+            bounds=req.bounds.as_tuple() if req.bounds else None,
+            filters=filters,
+        ))
+        if req.include_totals
+        else None
     )
 
     # --- ranking by IRR ------------------------------------------------------
@@ -142,6 +156,7 @@ def _run(
             sort_dir=req.sort_dir,
             rows=[ser.parcel_row(r, irr=v) for r, v in page],
             irr_filter_applied=True,
+            totals=totals,
         )
 
     # --- the table's Return column ------------------------------------------
@@ -172,6 +187,7 @@ def _run(
         sort_dir=req.sort_dir,
         rows=[ser.parcel_row(r, irr=page_returns.get(r["ssl"])) for r in rows],
         irr_filter_applied=irr_applied,
+        totals=totals,
     )
 
 

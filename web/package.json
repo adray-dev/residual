@@ -10,7 +10,8 @@
     "typecheck": "tsc -b --noEmit",
     "check:popup": "esbuild --bundle scripts/check-popup-placement.mjs --format=esm --platform=node --outfile=node_modules/.cache/popup-check.mjs --log-level=error && node node_modules/.cache/popup-check.mjs",
     "check:map": "esbuild --bundle scripts/check-map-style.mjs --format=esm --platform=node --outfile=node_modules/.cache/map-check.mjs --log-level=error && node node_modules/.cache/map-check.mjs",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "check:draw": "esbuild --bundle scripts/check-draw-ring.mjs --format=esm --platform=node --outfile=node_modules/.cache/draw-check.mjs --log-level=error && node node_modules/.cache/draw-check.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",

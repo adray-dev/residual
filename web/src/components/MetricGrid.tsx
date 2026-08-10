@@ -57,7 +57,7 @@ export function MetricGrid({
 }) {
   const cells: Cell[] = [
     returnCell(returns),
-    { key: "yield_on_cost", value: percent(returns.yield_on_cost) },
+    { key: "profit_margin", value: percent(returns.profit_margin) },
     { key: "total_development_cost", value: money(returns.total_development_cost) },
     { key: "cost_per_unit", value: money(returns.cost_per_unit) },
     { key: "noi", value: money(returns.noi) },

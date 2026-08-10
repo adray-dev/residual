@@ -106,6 +106,21 @@ export interface ParcelRow {
   irr: number | null;
 }
 
+/** Aggregates over the whole matching set, present only when asked for.
+ *
+ * Sums over parcels underwritten INDEPENDENTLY. Not an assemblage — combining adjacent
+ * lots changes the lot area, which changes which prototype fits, which changes the
+ * answer. Anywhere these are shown has to say so.
+ */
+export interface MapTotals {
+  parcels: number;
+  lot_area_sf: number | null;
+  buildable_sf: number | null;
+  units: number | null;
+  rlv_total: number | null;
+  median_rlv_per_buildable_sf: number | null;
+}
+
 export interface MapQuery {
   computed_at: string;
   total: number;
@@ -116,6 +131,7 @@ export interface MapQuery {
   sort_dir: string;
   rows: ParcelRow[];
   irr_filter_applied: boolean;
+  totals: MapTotals | null;
 }
 
 /** One `/parcels/search` hit. Carries a centroid so the map can move to it. */

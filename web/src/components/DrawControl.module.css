@@ -1,0 +1,91 @@
+/* Bottom-centre of the map. Not top-right, where the legend already lives, and not the
+   bottom-left corner, which MapLibre's own zoom control occupies. Centred low is where the
+   eye is already looking while placing corners. */
+.start,
+.strip {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-floating);
+  height: 34px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.start {
+  gap: 7px;
+  padding: 0 15px;
+  border: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.start:hover {
+  color: var(--accent);
+}
+
+.strip {
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+/* A pulsing accent dot: the one thing on screen saying the map is in a mode where a click
+   does something other than what it usually does. */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}
+
+.said {
+  font-variant-numeric: tabular-nums;
+}
+
+.keys {
+  color: var(--ink-25);
+  font-size: 11px;
+}
+
+.keys kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--canvas);
+  border-radius: var(--r-check);
+  padding: 1px 4px;
+}
+
+.cancel,
+.redraw {
+  border: 0;
+  background: var(--canvas);
+  border-radius: var(--r-pill);
+  height: 24px;
+  padding: 0 11px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.cancel:hover,
+.redraw:hover {
+  background: var(--accent-tint);
+  color: var(--accent);
+}

@@ -18,18 +18,42 @@ import maplibregl, {
 import { PMTiles, Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
+  DRAW_ACCENT,
+  DRAW_MASK_COLOR,
+  DRAW_MASK_OPACITY,
   FILL_OPACITY,
   PARCEL_BORDER,
   STATUS_COLORS,
   hatchImage,
   valueRamp,
 } from "../lib/mapStyle";
+import {
+  closeRing,
+  maskFor,
+  withinHandle,
+  type Position,
+  type Ring,
+} from "../lib/drawRing";
 
 const SCORED: FilterSpecification = ["==", ["get", "status"], "scored"];
 const HATCH = "exempt-hatch";
 
 const SOURCE = "parcels";
 const LAYER = "parcels"; // the tippecanoe layer name, from tiles/build_tiles.py
+
+// The draw tool's own sources. Plain GeoJSON, rewritten with setData as the user clicks.
+const MASK_SOURCE = "draw-mask";
+const AREA_SOURCE = "draw-area";
+const SKETCH_SOURCE = "draw-sketch";
+
+const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+
+/** One feature wrapping a geometry, for a setData call. */
+function only(geometry: GeoJSON.Geometry | null): GeoJSON.FeatureCollection {
+  return geometry
+    ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry }] }
+    : EMPTY;
+}
 
 // Registered once for the lifetime of the module: MapLibre keys protocols globally, and
 // re-adding on every mount would leak handlers across remounts.
@@ -49,6 +73,17 @@ export interface MapViewProps {
   onSelect: (parcelId: string, at: { x: number; y: number }) => void;
   /** Clicking bare canvas dismisses the popup. */
   onSelectNothing: () => void;
+  /** Draw mode: clicks place corners instead of selecting parcels. */
+  drawing: boolean;
+  /** The committed area, drawn as an outline with everything outside it veiled. */
+  drawnPolygon: Ring | null;
+  /** A closed ring. The app decides what to do with it — the map does not filter itself. */
+  onDrawComplete: (ring: Ring) => void;
+  /** Escape, or a click that cannot become an area. */
+  onDrawCancel: () => void;
+  /** Corner count while drawing, so the toolbar can say "3 corners — click the first to
+   * close" without the map owning any copy. */
+  onDrawProgress: (corners: number) => void;
 }
 
 export function MapView({
@@ -59,6 +94,11 @@ export function MapView({
   flyTo,
   onSelect,
   onSelectNothing,
+  drawing,
+  drawnPolygon,
+  onDrawComplete,
+  onDrawCancel,
+  onDrawProgress,
 }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -69,12 +109,25 @@ export function MapView({
   // any click can arrive.
   const onSelectRef = useRef(onSelect);
   const onSelectNothingRef = useRef(onSelectNothing);
+  const onDrawCompleteRef = useRef(onDrawComplete);
+  const onDrawCancelRef = useRef(onDrawCancel);
+  const onDrawProgressRef = useRef(onDrawProgress);
+  // Draw state lives in refs, not React state: the handlers are bound once at mount, and a
+  // re-render per placed corner would rebuild them for no benefit. The app is told the
+  // corner count through `onDrawProgress` and owns nothing else.
+  const drawingRef = useRef(drawing);
+  const cornersRef = useRef<Position[]>([]);
+  // Set by the mount effect so the `drawing` prop effect can discard a half-drawn ring.
+  const clearSketchRef = useRef<(() => void) | null>(null);
   // The objective is read once when the layers are created; the effect below repaints on
   // every later change, so this only has to be right at mount.
   const objectiveRef = useRef(objective);
   useEffect(() => {
     onSelectRef.current = onSelect;
     onSelectNothingRef.current = onSelectNothing;
+    onDrawCompleteRef.current = onDrawComplete;
+    onDrawCancelRef.current = onDrawCancel;
+    onDrawProgressRef.current = onDrawProgress;
     objectiveRef.current = objective;
   });
 
@@ -261,6 +314,69 @@ export function MapView({
         });
       }
 
+      // --- the draw-an-area tool ------------------------------------------
+      for (const id of [MASK_SOURCE, AREA_SOURCE, SKETCH_SOURCE]) {
+        instance.addSource(id, { type: "geojson", data: EMPTY });
+      }
+
+      // The veil. A drawn area cannot be a MapLibre filter — point-in-polygon is not
+      // expressible over tile attributes — so instead of hiding the parcels outside it,
+      // this covers the world and leaves a hole where the selection is. Same grammar as
+      // `parcels-dim`, and it sits directly on top of it for the same reason: hover and
+      // the selection ring are added after, so they stay legible through the veil.
+      instance.addLayer(
+        {
+          id: "draw-mask",
+          type: "fill",
+          source: MASK_SOURCE,
+          paint: { "fill-color": DRAW_MASK_COLOR, "fill-opacity": DRAW_MASK_OPACITY },
+        },
+        "parcels-hover",
+      );
+
+      // The committed outline. Dashed, so it reads as an annotation over the city rather
+      // than as another parcel boundary.
+      instance.addLayer({
+        id: "draw-area-line",
+        type: "line",
+        source: AREA_SOURCE,
+        paint: {
+          "line-color": DRAW_ACCENT,
+          "line-width": 2,
+          "line-dasharray": [3, 2],
+        },
+      });
+
+      // The rubber band, while drawing: placed corners, plus a segment to the cursor.
+      instance.addLayer({
+        id: "draw-sketch-fill",
+        type: "fill",
+        source: SKETCH_SOURCE,
+        filter: ["==", ["geometry-type"], "Polygon"],
+        paint: { "fill-color": DRAW_ACCENT, "fill-opacity": 0.1 },
+      });
+      instance.addLayer({
+        id: "draw-sketch-line",
+        type: "line",
+        source: SKETCH_SOURCE,
+        filter: ["!=", ["geometry-type"], "Point"],
+        paint: { "line-color": DRAW_ACCENT, "line-width": 2 },
+      });
+      instance.addLayer({
+        id: "draw-sketch-vertices",
+        type: "circle",
+        source: SKETCH_SOURCE,
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          // The first corner is the close handle, so it is drawn larger than the rest —
+          // the target has to look like a target before you can be asked to hit it.
+          "circle-radius": ["case", ["get", "first"], 6, 4],
+          "circle-color": "#ffffff",
+          "circle-stroke-color": DRAW_ACCENT,
+          "circle-stroke-width": 2,
+        },
+      });
+
       // Fit to what the tileset actually covers, rather than a hardcoded DC bbox that
       // would quietly go wrong if the parcel extract ever changed.
       archive
@@ -303,20 +419,129 @@ export function MapView({
       instance.getCanvas().style.cursor = id ? "pointer" : "";
     };
 
+    // --- draw mode ---------------------------------------------------------
+    /** Repaint the in-progress sketch: the placed corners, the line through them, and a
+     * rubber band out to wherever the cursor is. `null` cursor means "not hovering", which
+     * happens between a click and the next mouse move. */
+    const paintSketch = (cursor: Position | null) => {
+      const source = instance.getSource(SKETCH_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      if (!source) return;
+      const corners = cornersRef.current;
+      if (!corners.length) {
+        source.setData(EMPTY);
+        return;
+      }
+      const path = cursor ? [...corners, cursor] : corners;
+      const features: GeoJSON.Feature[] = corners.map((position, index) => ({
+        type: "Feature",
+        properties: { first: index === 0 },
+        geometry: { type: "Point", coordinates: position },
+      }));
+      if (path.length > 1) {
+        features.push({
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: path },
+        });
+      }
+      // Three corners is the first point at which there is an area to preview, so the
+      // translucent fill appears exactly when the shape becomes a shape.
+      if (path.length > 2) {
+        features.push({
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Polygon", coordinates: [[...path, path[0] as Position]] },
+        });
+      }
+      source.setData({ type: "FeatureCollection", features });
+    };
+
+    const clearSketch = () => {
+      cornersRef.current = [];
+      paintSketch(null);
+      onDrawProgressRef.current(0);
+    };
+
+    /** Try to close. Refuses silently if the ring is not one — `closeRing` returns null for
+     * a bow tie, a collinear run, or fewer than three corners — because the alternative is
+     * scolding the user for a shape they can simply keep drawing out of. */
+    const finish = () => {
+      const ring = closeRing(cornersRef.current);
+      if (!ring) return;
+      clearSketch();
+      onDrawCompleteRef.current(ring);
+    };
+
     instance.on("mousemove", (event) => {
+      if (drawingRef.current) {
+        paintSketch([event.lngLat.lng, event.lngLat.lat]);
+        return;
+      }
       const [feature] = instance.queryRenderedFeatures(event.point, { layers: pickable });
       setHover(feature ? featureId(feature) : null);
     });
-    instance.on("mouseout", () => setHover(null));
+    instance.on("mouseout", () => {
+      if (drawingRef.current) paintSketch(null);
+      else setHover(null);
+    });
 
     instance.on("click", (event) => {
+      if (drawingRef.current) {
+        const first = cornersRef.current.at(0);
+        // Clicking the first corner closes the ring. Tested in screen space, not degrees:
+        // "within ten pixels of that dot" is what the user is actually aiming at, and it
+        // has to mean the same thing at every zoom.
+        if (first && cornersRef.current.length >= 3) {
+          const handle = instance.project(first);
+          if (withinHandle(event.point, handle)) {
+            finish();
+            return;
+          }
+        }
+        cornersRef.current = [...cornersRef.current, [event.lngLat.lng, event.lngLat.lat]];
+        paintSketch(null);
+        onDrawProgressRef.current(cornersRef.current.length);
+        return;
+      }
       const [feature] = instance.queryRenderedFeatures(event.point, { layers: pickable });
       const id = feature ? featureId(feature) : null;
       if (id) onSelectRef.current(id, { x: event.point.x, y: event.point.y });
       else onSelectNothingRef.current();
     });
 
+    // Double-click closes. MapLibre's own double-click zoom is disabled for the duration
+    // in the effect below, or the closing gesture would also zoom the map in.
+    instance.on("dblclick", (event) => {
+      if (!drawingRef.current) return;
+      event.preventDefault();
+      finish();
+    });
+
+    // Escape cancels, Enter closes, Backspace takes back the last corner. Bound to the
+    // window rather than the canvas because the canvas is not focusable and the user's
+    // focus is wherever they last clicked in the surrounding UI.
+    const onKey = (event: KeyboardEvent) => {
+      if (!drawingRef.current) return;
+      if (event.key === "Escape") {
+        clearSketch();
+        onDrawCancelRef.current();
+      } else if (event.key === "Enter") {
+        finish();
+      } else if (event.key === "Backspace" || event.key === "Delete") {
+        event.preventDefault();
+        cornersRef.current = cornersRef.current.slice(0, -1);
+        paintSketch(null);
+        onDrawProgressRef.current(cornersRef.current.length);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    // Exposed so the effect that reacts to the `drawing` prop can wipe a half-drawn ring
+    // when the mode is turned off from the toolbar.
+    clearSketchRef.current = clearSketch;
+
     return () => {
+      window.removeEventListener("keydown", onKey);
+      clearSketchRef.current = null;
       // The archive is deliberately left registered on the protocol. It is keyed by URL,
       // so a remount reuses it (header and directory already fetched) instead of paying
       // for them again, and the only way to evict it is a field the library marks hidden.
@@ -358,6 +583,37 @@ export function MapView({
     if (instance.isStyleLoaded()) go();
     else instance.once("load", go);
   }, [flyTo]);
+
+  // Draw mode. The cursor, MapLibre's double-click zoom, and any half-drawn ring all
+  // follow the prop — the toolbar button owns the mode, the map only obeys it.
+  useEffect(() => {
+    drawingRef.current = drawing;
+    const instance = map.current;
+    if (!instance) return;
+    instance.getCanvas().style.cursor = drawing ? "crosshair" : "";
+    if (drawing) instance.doubleClickZoom.disable();
+    else {
+      instance.doubleClickZoom.enable();
+      // Leaving draw mode with corners on screen would strand an outline that no longer
+      // responds to clicks.
+      clearSketchRef.current?.();
+    }
+  }, [drawing]);
+
+  // The committed area: its outline, and the veil over everything outside it.
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    const apply = () => {
+      const mask = instance.getSource(MASK_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      const area = instance.getSource(AREA_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      if (!mask || !area) return;
+      mask.setData(only(drawnPolygon ? maskFor(drawnPolygon) : null));
+      area.setData(only(drawnPolygon));
+    };
+    if (instance.isStyleLoaded() && instance.getSource(MASK_SOURCE)) apply();
+    else instance.once("idle", apply);
+  }, [drawnPolygon]);
 
   // Selection is owned by the app (the panel and the map must agree), so the map follows
   // the prop rather than holding its own copy.

@@ -36,7 +36,7 @@ function rowsFor(vocab: Vocabulary): Row[] {
     // so the superlative is visibly earned.
     { label: "Value per unit", value: (r) => moneyExact(r.per_unit_value) },
     { label: vocab.metric("irr"), highlight: true, value: (r) => percent(r.returns.irr) },
-    { label: vocab.metric("yield_on_cost"), value: (r) => percent(r.returns.yield_on_cost) },
+    { label: vocab.metric("profit_margin"), value: (r) => percent(r.returns.profit_margin) },
     {
       label: vocab.metric("equity_multiple"),
       value: (r) => multiple(r.returns.equity_multiple),

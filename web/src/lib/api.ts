@@ -92,6 +92,25 @@ export function getMapQuery(
   return request<MapQuery>(`/map/query?${query}`, { signal });
 }
 
+/** The body form of the same read.
+ *
+ * Exists for one reason: a drawn area is hundreds of coordinates and will not fit in a
+ * URL. `with_returns` stays in the query string because that is where the endpoint takes
+ * it — it is a shape-of-response flag, not a filter.
+ */
+export function postMapQuery(
+  body: unknown,
+  withReturns = false,
+  signal?: AbortSignal,
+): Promise<MapQuery> {
+  const suffix = withReturns ? "?with_returns=true" : "";
+  return request<MapQuery>(`/map/query${suffix}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
 /** The parcel record: everything the popup shows, with no engine run behind it.
  *
  * This is the screening tier, so it stays fast enough to fire on every map click. The

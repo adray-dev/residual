@@ -115,9 +115,6 @@ def _assert_matches(xlsx: bytes, engine: dict, tmp_path):
     )
     assert sheet("Yearly income (NOI)") == pytest.approx(returns["noi"], abs=CENT)
     assert sheet("Sale value at exit") == pytest.approx(returns["exit_value"], abs=CENT)
-    assert sheet("Income vs cost (yield on cost)") == pytest.approx(
-        returns["yield_on_cost"], abs=RATE
-    )
     assert sheet("Profit margin") == pytest.approx(returns["profit_margin"], abs=RATE)
     # At the solved land value the IRR is the hurdle by construction — that identity is the
     # in-sheet proof that the seeded RLV is the right one.

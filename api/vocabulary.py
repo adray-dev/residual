@@ -22,7 +22,6 @@ METRIC_LABELS: dict[str, tuple[str, str]] = {
     "rlv_per_buildable_sf":      ("Feasibility value per SF",    "RLV per buildable SF"),
     "feasibility_gap":           ("Value above assessed land",   "Feasibility gap"),
     "irr":                       ("IRR",                         "Levered IRR"),
-    "yield_on_cost":             ("Income vs cost",              "Yield on cost"),
     "equity_multiple":           ("Cash back on equity",         "Equity multiple"),
     "noi":                       ("Yearly income (NOI)",         "Stabilized NOI"),
     "total_development_cost":    ("Total cost to build",         "Total development cost"),
@@ -47,18 +46,69 @@ def label(key: str) -> str:
 
 # --- prototypes ------------------------------------------------------------
 # "Best build: Garden walk-up", never "garden". Values match engine/prototypes.py keys.
+# FOUR engine prototypes, THREE user-facing labels (v1.8).
+#
+# `5-over-1` and `midrise` deliberately share the name "Multifamily". They are the same
+# building to a tenant and the same product to the market — 1.40 rent premium and -25 bps
+# on both — and they are separate prototypes only so the engine can price 4-7 storeys as
+# the wood it is built from ($260/SF) instead of as concrete ($320/SF). That is a cost
+# fact, not a product distinction, so it stays in the model and out of the interface.
+#
+# This map is the ONLY place the collapse happens. Every surface — popup, table,
+# drill-down, compare, CSV, Excel — renders through `PROTOTYPE_LABELS`, so there is one
+# definition of what a user sees and no component can disagree with another.
+#
+# `garden` keeps its label though it is benched (§5): retention holds the previous batch,
+# and that batch has garden winners whose rows must still render a name.
 PROTOTYPE_LABELS: dict[str, str] = {
     "townhome": "Townhome",
     "garden": "Garden walk-up",
-    "midrise": "Midrise",
-    "highrise": "Highrise",
+    "5-over-1": "Multifamily",
+    "midrise": "Multifamily",
+    "highrise": "High-rise",
 }
+
+# Longest id first, so a shorter id can never match inside a longer one.
+_PROTOTYPE_IDS_BY_LENGTH = sorted(PROTOTYPE_LABELS, key=len, reverse=True)
+
+
+def prototype_label(key: str | None) -> str:
+    """"Multifamily" for `5-over-1`. Falls back to the key so a gap is visible, not blank."""
+    if not key:
+        return ""
+    return PROTOTYPE_LABELS.get(key, key)
+
+
+def humanize(message: str) -> str:
+    """Swap engine prototype ids for user-facing labels inside a message.
+
+    `engine/` is pure and knows nothing about the interface, so `fit_program` raises
+    "5-over-1 requires >= 6,000 SF lot; parcel is 4,000 SF" — correct for a log, and a name
+    the product does not use. Rather than teach the engine about labels (it must not) or
+    hand-write a parallel set of messages (they would drift), the id is translated here, at
+    the boundary where an engine exception becomes an HTTP detail string.
+
+    This is the safety net for the §5.1 rule that `5-over-1` never reaches a user. The
+    labels are the same map every other surface renders through, so it cannot disagree
+    with the popup or the table.
+    """
+    for key in _PROTOTYPE_IDS_BY_LENGTH:
+        label = PROTOTYPE_LABELS[key]
+        if key != label:
+            message = message.replace(key, label)
+    return message
+
 
 # --- construction types ----------------------------------------------------
 # "Build type: Wood frame", never "Wood V". Values match engine.types.ConstructionType.
 CONSTRUCTION_LABELS: dict[str, str] = {
     "wood_v": "Wood frame",
-    "podium": "Wood over podium",
+    # "Wood over podium" is the literal definition of a 5-over-1, so it named the build
+    # type the interface does not use — in the drill-down's Build type row and beside the
+    # workbook's hard-cost rate. "Wood frame" is true at the granularity the UI speaks
+    # (Type III/V over a Type I podium IS wood-framed) and shares the townhome line, which
+    # is the point: the reader learns what the shell is made of, not which tier it is.
+    "podium": "Wood frame",
     "concrete_i": "Concrete",
 }
 

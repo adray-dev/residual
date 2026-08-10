@@ -47,6 +47,7 @@ from engine.prototypes import (
     EXIT_CAP_ADJUSTMENT,
     MIN_EXIT_CAP_RATE,
     RENT_PREMIUM_FACTOR,
+    hard_cost_psf,
 )
 
 # --- presentation ----------------------------------------------------------
@@ -210,8 +211,11 @@ def build(result: dict) -> Workbook:
         ("parking_stalls", "Parking stalls", program.parking_stalls, NUM),
         ("parking_cost", "Cost per stall",
          assumptions.cost["parking_cost_per_stall"][program.parking_type], MONEY),
+        # The EFFECTIVE rate: construction-type cost with the prototype's height factor
+        # already applied (§5). The workbook must price the shell exactly as the engine
+        # does, and highrise carries +6.25% over the same concrete a midrise uses.
         ("hard_cost_psf", f"Hard cost $/SF ({vocab.CONSTRUCTION_LABELS.get(ctype, ctype)})",
-         market.hard_cost_psf[program.construction_type], MONEY_2),
+         hard_cost_psf(market.hard_cost_psf[program.construction_type], proto), MONEY_2),
         ("rent_premium", "Product rent premium", RENT_PREMIUM_FACTOR.get(proto, 1.0), MULT),
         ("cap_adjustment", "Product cap adjustment", EXIT_CAP_ADJUSTMENT.get(proto, 0.0), PCT),
         ("min_cap", "Minimum exit cap", MIN_EXIT_CAP_RATE, PCT),
@@ -613,9 +617,6 @@ def build(result: dict) -> Workbook:
         r, "noi", "Yearly income (NOI)", f"={xref('noi', stab)}*12", MONEY,
     )
     r = m.label_value(
-        r, "yoc", "Income vs cost (yield on cost)", f"={m.at['noi']}/{m.at['tdc']}", PCT,
-    )
-    r = m.label_value(
         r, "exit_value", "Sale value at exit",
         f"={xref('noi', sale)}*12/{A['eff_cap']}", MONEY,
     )
@@ -649,7 +650,7 @@ def build(result: dict) -> Workbook:
         ("Yearly income (NOI)", m.at["noi"], outputs.noi, MONEY),
         ("Sale value at exit", m.at["exit_value"], outputs.exit_value, MONEY),
         ("Annual return (levered IRR)", m.at["irr"], outputs.irr, PCT),
-        ("Income vs cost", m.at["yoc"], outputs.yield_on_cost, PCT),
+        ("Profit margin", m.at["profit_margin"], outputs.profit_margin, PCT),
     ]
     for label, live, engine_value, fmt in recon:
         mws.cell(row=r, column=1, value=label).font = Font(size=10)
