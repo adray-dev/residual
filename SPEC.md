@@ -103,6 +103,58 @@ moving on. Build Stage A first and prove it with `pytest` before touching data.
 >   `prototype_id`, following the existing `min_lot_sf` / `NATIONAL_HARD_COST_PSF` pattern, so
 >   the pinned schema and the `prototypes` table stay as they are.
 
+> **Revision v1.7 — product-type factors re-tuned for variety (§2.4, §5, §11).**
+> v1.4 gave product type a voice but not enough of one: at 1.15/1.30 the mid- and high-rise
+> premiums never covered $340–430/SF concrete, so the bake still put townhome on essentially
+> every parcel and the map had one product on it.
+> - `RENT_PREMIUM_FACTOR` is now **townhome 1.15 / garden 1.00 / midrise 1.40 / highrise
+>   1.60**. The base moved from townhome to garden, which also fixes an ordering that was
+>   backwards: a rowhouse with a private entry and no shared corridor out-rents a walk-up
+>   flat, and v1.4 had them equal.
+> - `efficiency_ratio` rises for the elevator products: **midrise 0.80 → 0.85, highrise
+>   0.75 → 0.80**. This raises rentable area against an unchanged shell, so it moves revenue
+>   without moving `total_development_cost`.
+> - `EXIT_CAP_ADJUSTMENT` is unchanged (0 / 0 / −25 bps / −50 bps).
+> - Provenance is unchanged and deliberately stays `national`: these are **demo-tuned for
+>   product variety, not sourced rents**. §11 carries the full caveat, including the fact
+>   that efficiency is invisible to `score_confidence` because it is a prototype attribute
+>   rather than a market input, so confidence does not register that change at all.
+> - Stage A hand checks (a), (d) and (e) were re-derived against the new factors, not
+>   re-baselined: every line of arithmetic in the comments was recomputed.
+> - **`garden` is benched** (`DISABLED_PROTOTYPES`, §5). The same spread that lets mid- and
+>   high-rise win makes garden unwinnable, so v1 ships three competing products. Defined,
+>   not deleted: the dataclass, the table row and the label all stay, and the previous
+>   retained batch still contains garden winners that must keep rendering a name.
+
+> **Revision v1.8 — the prototype library splits by construction type (§2.4, §5, §5.1, §11).**
+> Everything 5 storeys and up was priced as concrete, which overstated the cost of the most
+> common urban infill product in America by $60/SF. The library now has four active tiers
+> whose story bands partition the height range with no overlap.
+> - New prototype **`5-over-1`** (wood over podium, 4–7 storeys, $260/SF, 0.85 efficiency,
+>   1.40 premium, 6,000 SF minimum lot). Midrise becomes concrete 8–12 at $320; highrise
+>   becomes 13+ at $340 with efficiency 0.85; townhome goes to $220 and its premium returns
+>   to the 1.00 base.
+> - Hard cost stays keyed by construction type, with a new per-prototype `HARD_COST_FACTOR`
+>   carrying the height premium (highrise 1.0625) — midrise and highrise are the same
+>   structural system at different prices, and inventing a construction type to say so would
+>   have been a lie in the schema.
+> - `5-over-1` joins `GROUND_FLOOR_ACTIVE_PROTOTYPES`: the "1" in the name is the podium.
+> - **Three user-facing labels over four prototypes** (§5.1): 5-over-1 and midrise are both
+>   "Multifamily". One mapping, in `api/vocabulary.py`, shipped via /meta.
+> - Stage A hand checks (a), (c), (d) and (e) re-derived; (a) and (e) now exercise 5-over-1,
+>   because at five and six storeys that is what the envelope admits.
+> - Every figure is an unsourced demo placeholder (§11).
+
+> **Revision v1.9 — townhome rent premium 1.00 → 0.90 (§2.4, §5, §11).**
+> Townhome was `is_best` on 98.8% of scored parcels, which made the map a single colour of
+> product. Its premium is cut to 0.90, below garden's 1.00 base, on the rationale that a
+> rowhouse's large units carry a lower per-SF rent than a small walk-up flat.
+> - **Side effect that outranks the change itself:** this flips the garden comparison.
+>   Garden now out-earns townhome by 4.9% per dollar of shell and would win 1,679 scored
+>   parcels if un-benched. The §5 and §11 justification for benching it has been rewritten
+>   accordingly — the bench is now hiding a winner, and that is flagged as the top open item.
+> - Unsourced, like every other product-type factor (§11).
+
 ---
 
 ## 0. Product in one paragraph
@@ -207,9 +259,10 @@ completes + hold buffer.
 | rent_premium_factor | product-type multiplier on the base rent (§5) | national |
 | exit_cap_adjustment | product-type adjustment on the base cap (§5) | national |
 
-**Product type is a revenue dimension (v1.4).** A submarket supplies ONE base rent and ONE
-base cap. Those are quoted for the low-rise product; the pro forma then adjusts both by
-prototype before any revenue is computed:
+**Product type is a revenue dimension (v1.4; factors re-tuned in v1.7).** A submarket
+supplies ONE base rent and ONE base cap. Those are quoted for the **garden walk-up** — the
+1.00 product — and the pro forma then adjusts both by prototype before any revenue is
+computed:
 
 ```
 effective rent = market.rent_psf_residential_monthly * RENT_PREMIUM_FACTOR[prototype]
@@ -221,8 +274,14 @@ contradict the map colour it was opened from. Without it, density is unwinnable 
 construction: a townhome turns $1 of hard cost into 4.286 rentable SF against a midrise's
 2.353, so at one rent and one cap the walk-up wins every parcel in every submarket at every
 rent level, which is exactly what the bake produced (townhome `is_best` on 100% of scored
-parcels). The factors themselves are **placeholder assumptions, not sourced** — see §5 for
-the values and §11 for what they are waiting on. They are tagged `national` in `PROVENANCE`
+parcels). v1.4's first pass at the factors (1.00/1.00/1.15/1.30) was not enough spread to
+change that outcome; v1.7 widened it to 1.15/1.00/1.40/1.60 and raised mid/high-rise
+efficiency to 0.85/0.80 so the elevator products convert their premium into rentable area.
+**v1.8** returned townhome to 1.00, added `5-over-1` at 1.40 — the same premium as midrise,
+because they are the same product to a tenant — and set every elevator tier's efficiency to
+0.85. **v1.9** cut townhome to 0.90, below the garden base: a rowhouse's large units carry a
+lower per-SF rent than a small walk-up flat, and townhome was winning 98.8% of the city. The factors themselves remain **placeholder assumptions, not sourced** —
+see §5 for the values and §11 for what they are waiting on. They are tagged `national` in `PROVENANCE`
 precisely so confidence reports them as un-tailored; a real `MarketData` row cannot promote
 them, so adding them *lowers* every parcel's confidence (0.0625 → 0.0577).
 
@@ -687,24 +746,120 @@ Write **at least four** hand-check parcels covering: (a) FAR-binding, (b) height
 
 ## 5. The prototype library (`engine/prototypes.py`)
 
-Four prototypes, all rental. `min_stories` is the admissibility gate against the envelope.
+Four prototypes are DEFINED, three COMPETE. `min_stories` is the admissibility gate against
+the envelope. All rental.
+
+> **`garden` is defined but disabled in v1** (`§5 DISABLED_PROTOTYPES`). It stays fully
+> specified below, keeps its `prototypes` table row and its plain-language label, and is
+> simply excluded from the candidate set the bake ranks — so it can never be `is_best` and
+> never appears as a parcel's best build. Re-enabling is emptying that one set.
+> **Original reason (v1.7), no longer true:** garden was dominated by townhome on every
+> axis at once and won zero of the 2,503 parcels it was admissible on, so benching it cost
+> nothing.
+>
+> **Current status (v1.9): garden is NOT dominated and the bench is a presentation choice.**
+> Cutting townhome's premium to 0.90 flipped the comparison — garden now returns ~4.9% more
+> revenue-area per dollar of shell (4 × 0.85 × 1.00 = 3.40 over 4 × $220 = $880, against
+> townhome's 3 × 0.90 × 0.90 = 2.43 over 3 × $220 = $660). Measured against the real bake
+> with the full library ranked on `rlv_total`, **garden would take 1,679 of 79,073 scored
+> parcels** — 67% of its admissible set — beating townhome on 1,604 and 5-over-1 on 75.
+> Those parcels currently display as whatever came second. The bench may still be the right
+> product call (three build types demo better than four), but it is now hiding a winner
+> rather than excluding a loser. See §11.
 
 | id | construction_type | min–max stories | min_lot_sf | efficiency | parking | default mix (studio/1br/2br) | avg SF (studio/1br/2br) | hard $/SF (national default) |
 |---|---|---|---|---|---|---|---|---|
-| townhome | wood_v | 2–3 | 1,500 | 0.90 | surface | 0/40/60 | –/900/1300 | $200 |
-| garden | wood_v | 2–4 | 15,000 | 0.85 | surface | 20/50/30 | 500/750/1050 | $210 |
-| midrise | concrete_i | 5–12 | 8,000 | 0.80 | podium | 25/50/25 | 500/750/1050 | $340 |
-| highrise | concrete_i | 12–30 | 12,000 | 0.75 | structured | 30/50/20 | 480/720/1000 | $430 |
+| townhome | wood_v | 2–3 | 1,500 | 0.90 | surface | 0/40/60 | –/900/1300 | $220 |
+| garden *(disabled)* | wood_v | 2–4 | 15,000 | 0.85 | surface | 20/50/30 | 500/750/1050 | $220 |
+| 5-over-1 | podium | 4–7 | 6,000 | 0.85 | podium | 25/50/25 | 500/750/1050 | $260 |
+| midrise | concrete_i | 8–12 | 8,000 | 0.85 | podium | 25/50/25 | 500/750/1050 | $320 |
+| highrise | concrete_i | 13–30 | 12,000 | 0.85 | structured | 30/50/20 | 480/720/1000 | $340 |
 
-**Product-type revenue factors (v1.4).** Applied by `screening_rlv` and `full_cashflow` to
-the submarket base rent and base cap (§2.4). **Placeholder assumptions — not sourced.**
+**The story bands do not overlap (v1.8).** townhome 2–3, 5-over-1 4–7, midrise 8–12,
+highrise 13+. This bounds what each tier **builds**, not which tiers are **admissible**:
+admissibility is `min_stories <= envelope.max_floors`, and each prototype then builds to its
+own cap. A tall envelope therefore admits several tiers at once and they compete on RLV — on
+a 9-floor RA-5 lot, townhome (3 floors), 5-over-1 (7) and midrise (9) are all admissible and
+5-over-1 wins, because seven storeys of wood at $260/SF beat nine of concrete at $320. That
+is the intended behaviour: building taller is worth it only when the extra area outearns the
+more expensive structure, which is exactly the question the split exists to ask. (`garden`
+overlaps two bands, which is one more reason it is benched.)
+
+**Cost follows construction, and height is priced on top of it.** The pro forma prices a
+shell as `market.hard_cost_psf[construction_type]` — cost follows how a thing is built, and
+that is the hook a submarket cost row plugs into. Midrise and highrise are both concrete
+Type I and are not the same price, so the difference rides a per-prototype factor rather
+than an invented fourth construction type:
+
+| id | construction $/SF | × HARD_COST_FACTOR | = hard $/SF |
+|---|---:|---:|---:|
+| townhome | wood_v 220 | 1.0 | 220 |
+| 5-over-1 | podium 260 | 1.0 | 260 |
+| midrise | concrete_i 320 | 1.0 | 320 |
+| highrise | concrete_i 320 | **1.0625** | 340 |
+
+A fake `CONCRETE_HIGHRISE` construction type would claim a difference in structural system
+that does not exist; +6.25% for deeper foundations, crane and hoist logistics, more
+elevators and higher wind loading is the honest shape. It is multiplicative, so a submarket
+that one day seeds its own concrete cost gets that number scaled rather than overwritten.
+
+**Product-type revenue factors (v1.4, re-tuned v1.7).** Applied by `screening_rlv` and
+`full_cashflow` to the submarket base rent and base cap (§2.4).
+**Placeholder assumptions — not sourced**, and the v1.7 values are demo-tuned for product
+variety on the map rather than measured. Note the base moved: **garden**, not townhome, is
+now the 1.00 product the submarket rent is quoted for.
 
 | id | rent_premium_factor | exit_cap_adjustment | rationale (assumed, unverified) |
 |---|---|---|---|
-| townhome | 1.00 | +0 bps | the base — submarket rent is quoted for this product |
-| garden | 1.00 | +0 bps | walk-up, no elevator or amenity package |
-| midrise | 1.15 | −25 bps | new elevator product, amenity package |
-| highrise | 1.30 | −50 bps | full-service Class A, institutional buyer pool |
+| townhome | 0.90 | +0 bps | large units — per-SF rent on a 1,300 SF 2br is not per-SF rent on a 750 SF 1br |
+| garden *(disabled)* | 1.00 | +0 bps | the base the other factors are quoted against — walk-up, no elevator or amenity package |
+| 5-over-1 | 1.40 | −25 bps | elevator product with an amenity package |
+| midrise | 1.40 | −25 bps | **identical to 5-over-1 by design** — same building to a tenant |
+| highrise | 1.60 | −50 bps | full-service Class A, views, institutional buyer pool |
+
+**5-over-1 and midrise share every revenue input** — premium, cap adjustment, efficiency,
+unit mix, unit sizes. They are separate prototypes for exactly one reason: 4–7 storeys are
+built in wood and 8–12 in concrete, and pricing the first as the second overstated its cost
+by $60/SF. Everything a tenant or a buyer sees is the same, which is why §5.1 gives them one
+user-facing name.
+
+### 5.1 User-facing build labels
+
+Four active prototypes, **three** labels. The mapping lives in `api/vocabulary.py`
+(`PROTOTYPE_LABELS`) and ships to the client in `/meta`, so there is one definition and no
+surface can disagree with another.
+
+| engine prototype | user sees |
+|---|---|
+| townhome | Townhome |
+| 5-over-1 | **Multifamily** |
+| midrise | **Multifamily** |
+| highrise | High-rise |
+
+The wood/concrete split is a cost fact, not a product distinction, so it stays in the model
+and out of the interface: a parcel whose best build is 5-over-1 and one whose best build is
+concrete midrise both read "Multifamily", with the same chip colour and no qualifier.
+
+**`5-over-1` is an internal identifier and must never be rendered.** It remains the
+prototype id — on the wire, in the tile's `proto` attribute and in `bake_results`, per the
+convention that payload values are the engine's names — but no string a user reads may
+contain it. Four things enforce that:
+
+- `PROTOTYPE_LABELS` maps it to "Multifamily", and every surface renders through that map.
+- `vocabulary.humanize()` translates prototype ids inside engine exception text at the API
+  boundary. `engine/` is pure and raises "5-over-1 requires >= 6,000 SF lot", which is
+  correct for a log and is a name the product does not use; teaching the engine about
+  labels would break §1's purity rule and hand-writing parallel messages would drift.
+- The build-type filter's "Multifamily" checkbox selects BOTH ids, and the table's build
+  chip uses ONE tint for both — a different colour behind the same word would leak the
+  split the collapse exists to hide.
+- `CONSTRUCTION_LABELS["podium"]` is "Wood frame", not "Wood over podium". The latter is
+  the literal definition of a 5-over-1, so it named the tier in the drill-down's Build type
+  row and beside the workbook's hard-cost rate. "Wood frame" is true at the granularity the
+  UI speaks and shares the townhome line.
+
+Three contract tests sweep for it: the /meta label block, a live 422 refusal, and every
+display string in `/meta`, `/parcel`, `/underwrite` and `/map/query`.
 
 The effective cap is floored at `MIN_EXIT_CAP_RATE = 0.001` so a future submarket cap or a
 hand-edited assumption set cannot divide by zero in the exit valuation (unreachable at v1's
@@ -1235,14 +1390,83 @@ only place the full engine runs live, one parcel at a time, cached, re-run only 
   distortion in the bake. Fix needs a street-segment layer.
 - Coverage-ratio setback simplification (§3.2) — no true setback geometry without lot dimensions.
 - **Product-type rent premium and exit-cap adjustment are placeholder assumptions (§2.4/§5).**
-  `RENT_PREMIUM_FACTOR` (1.00/1.00/1.15/1.30) and `EXIT_CAP_ADJUSTMENT` (0/0/−25bps/−50bps)
-  were chosen as plausible starting values to give product type a voice in the model, not
-  measured from anything. They are load-bearing for which prototype wins a parcel, so the
-  `is_best` distribution across the map is only as good as these two numbers. What they want
-  is **real rent-by-product-type and cap-by-product-type data per submarket** — DC Class A
-  elevator rents versus rowhouse rents is an empirical question with a real answer, and these
-  are not it. Both are tagged `national` in `PROVENANCE`, so confidence already reports them
-  as un-tailored. Do not present the resulting prototype ordering as a finding until seeded.
+  `RENT_PREMIUM_FACTOR` (1.15/1.00/1.40/1.60 as of v1.7) and `EXIT_CAP_ADJUSTMENT`
+  (0/0/−25bps/−50bps) were chosen as plausible starting values to give product type a voice
+  in the model, not measured from anything. They are load-bearing for which prototype wins a
+  parcel, so the `is_best` distribution across the map is only as good as these two numbers.
+  What they want is **real rent-by-product-type and cap-by-product-type data per submarket** —
+  DC Class A elevator rents versus rowhouse rents is an empirical question with a real
+  answer, and these are not it. Both are tagged `national` in `PROVENANCE`, so confidence
+  already reports them as un-tailored. Do not present the resulting prototype ordering as a
+  finding until seeded.
+- **The v1.7 factor re-tune is DEMO-TUNED, and is the most explicitly unsourced number in
+  the model (§2.4/§5).** v1.4's spread (1.00/1.00/1.15/1.30) left mid- and high-rise winning
+  nowhere, so the map had exactly one product on it. v1.7 widened the spread — garden became
+  the 1.00 base, townhome went to 1.15 (a rowhouse with its own front door does out-rent a
+  walk-up flat, which the previous 1.00/1.00 pair had backwards), midrise to 1.40 and
+  highrise to 1.60 — expressly so that denser product can win somewhere and the platform has
+  variety to show. That is a product decision, not a market finding. Two consequences to
+  hold onto: the ordering townhome > garden is the only part of the change with an
+  independent rationale, and every `is_best` result involving mid- or high-rise is
+  downstream of a number picked to make it possible. Supersede this whole entry with
+  seeded rent-by-product-type data before any of it is shown to a customer as analysis.
+- **`garden` is benched, and as of v1.9 the bench HIDES A WINNER rather than excluding a
+  loser (§5). This is the highest-priority open item in this list.** The justification has
+  eroded in three steps: v1.7 townhome premium 1.15 → garden dominated 40%, wins zero;
+  v1.8 townhome 1.00 → dominated by 5.9%; v1.9 townhome 0.90 → **garden now out-earns
+  townhome by 4.9% per dollar of shell.** Measured over the real bake with the full library
+  ranked on `rlv_total`, garden takes **1,679 of 79,073 scored parcels** (67% of its
+  admissible set), beating townhome on 1,604 and 5-over-1 on 75. Those 1,679 parcels are
+  currently shown to users as their second-best build. Nothing about the model is wrong —
+  the candidate set is simply narrower than the library — but the platform is now displaying
+  a "best build" that is not the best build on 2.1% of scored parcels. Either un-bench
+  garden (delete one entry from `DISABLED_PROTOTYPES`; it would need a fourth user-facing
+  label or a mapping onto an existing one) or accept and document the gap. Do not let this
+  reach a customer demo undecided. Two things follow. First, the honest reading of the v1
+  prototype library is **three products, not four** — do not describe garden walk-ups as
+  something the platform evaluates. Second, this is downstream of a placeholder: narrowing
+  the townhome premium (1.15) toward garden's 1.00 would bring it back, so the bench is a
+  consequence of an unsourced number and should be revisited the moment real
+  rent-by-product-type data lands, not treated as a finding about DC. The code keeps the
+  prototype whole precisely so that revisit is a one-line change.
+- **Townhome's 0.90 rent premium is a calibration target, not a measurement (§2.4).** It
+  was set to stop townhome winning 98.8% of the city, and the rationale offered for it —
+  large rowhouse units carrying a lower per-SF rent than small flats — is plausible and
+  entirely unverified. It is also the single most consequential number in the model, because
+  townhome is admissible on 100% of scored parcels and therefore sets the bar every other
+  product must clear. Treat the whole `is_best` distribution as a function of this one
+  figure until real rent-by-product-type data exists.
+- **The v1.8 four-tier cost schedule is an unsourced demo placeholder in its entirety
+  (§5).** Every number in it — townhome $220, 5-over-1 $260, midrise $320, highrise $340,
+  the 1.0625 height factor, the 4–7 / 8–12 / 13+ band boundaries, and `5-over-1`'s 6,000 SF
+  minimum lot — was chosen to make the wood/concrete cost split behave plausibly, not
+  measured from a cost index. The direction is defensible and well established in practice
+  (wood is cheaper than concrete; the crossover sits somewhere around six to seven storeys;
+  tall concrete costs more than short concrete). The magnitudes are not researched, and they
+  are load-bearing for which product wins a parcel — the split alone moved the §4 scaffold
+  parcel from an RLV of −$111,444 to +$2,388,556 without changing one thing about the
+  building. All of it is tagged `national` in `PROVENANCE`, and `HARD_COST_FACTOR` is not in
+  `PROVENANCE` at all, being a prototype attribute rather than a market input — the same
+  blind spot recorded below for efficiency. Wants a real cost index by construction type and
+  height band (RSMeans, Cumming, a local GC), at which point the whole table is replaced
+  rather than adjusted.
+- **The user-facing build vocabulary hides a real modeling distinction, deliberately (§5.1).**
+  `5-over-1` and `midrise` both display as "Multifamily". That is the intended design — the
+  wood/concrete difference is a cost fact, not something a tenant or a buyer experiences —
+  but it does mean the interface cannot answer "why did these two identical-looking parcels
+  price differently?" A user comparing a 6-storey and a 10-storey both labelled Multifamily
+  sees a $60/SF cost gap with nothing on screen explaining it. Accepted for v1; if it causes
+  confusion in demos the fix is a construction-type row in the drill-down, not un-collapsing
+  the label.
+- **Mid- and high-rise efficiency ratios were raised in v1.7 without a source (§5).**
+  midrise 0.80 → 0.85, highrise 0.75 → 0.80. Net-to-gross for elevator residential is a
+  measurable design fact (core, corridor, and lobby as a share of the floorplate) and
+  0.85/0.80 is at the optimistic end of the plausible band, not a researched figure. Unlike
+  the rent factors this one is NOT visible in `PROVENANCE` — efficiency is a `Prototype`
+  attribute, not a market input, so `score_confidence` never sees it and confidence does not
+  fall when it changes. It is load-bearing in both directions: it raises revenue on an
+  unchanged shell cost, so it moves RLV without moving `total_development_cost`. Wants real
+  net-to-gross ratios by construction type.
 - Ward-level rents — submarket averages; parcel-level comps are the data-moat upgrade.
 - Historic parcels gated, not modeled — HPRB-compatible redevelopment is a later feature.
 - Screening RLV (unlevered, margin-based) vs full RLV (levered, IRR-based) will diverge;

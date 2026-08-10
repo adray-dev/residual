@@ -41,9 +41,12 @@ FALLBACK_EXIT_CAP = 0.055
 # SPEC §5 national fallback hard $/SF, keyed by ConstructionType value (matches
 # `MarketData.hard_cost_psf`, which the pro forma indexes by `program.construction_type`).
 FALLBACK_COST_PSF = {
-    "wood_v": 210,
+    # v1.8: the four prototypes span three construction types, and highrise carries a
+    # further +6.25% height factor (§5 HARD_COST_FACTOR) on top of concrete_i, landing it
+    # at $340. townhome 220 / 5-over-1 260 / midrise 320 / highrise 340.
+    "wood_v": 220,
     "podium": 260,
-    "concrete_i": 340,
+    "concrete_i": 320,
 }
 
 SOURCE_TAG = "national_default"

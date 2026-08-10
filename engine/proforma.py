@@ -1,6 +1,10 @@
 import numpy as np
 
-from engine.prototypes import effective_exit_cap, effective_rent_psf_monthly
+from engine.prototypes import (
+    effective_exit_cap,
+    effective_rent_psf_monthly,
+    hard_cost_psf,
+)
 from engine.solve import safe_irr
 from engine.types import (
     Assumptions,
@@ -43,7 +47,11 @@ def screening_rlv(
     exit_value = noi / exit_cap
 
     # --- costs (land excluded — RLV solves for it) ---
-    hard = program.gross_sf * market.hard_cost_psf[program.construction_type]
+    # Construction-type $/SF, then the prototype's height premium (§5) — midrise and
+    # highrise share a structural system and do not share a price.
+    hard = program.gross_sf * hard_cost_psf(
+        market.hard_cost_psf[program.construction_type], program.prototype_id
+    )
     hard += program.parking_stalls * assumptions.cost["parking_cost_per_stall"][program.parking_type]
     hard += _demo_cost(parcel, assumptions)
     soft = hard * assumptions.cost["soft_cost_pct"]
@@ -136,7 +144,11 @@ def full_cashflow(
     # ---- costs (§6.2) ----
     land_v[0] = land
 
-    shell = program.gross_sf * market.hard_cost_psf[program.construction_type]
+    # Same basis as the screening tier (§5) — the two must price a building identically or
+    # the drill-down contradicts the map colour it was opened from.
+    shell = program.gross_sf * hard_cost_psf(
+        market.hard_cost_psf[program.construction_type], program.prototype_id
+    )
     shell += program.parking_stalls * cost_a["parking_cost_per_stall"][program.parking_type]
     demo = _demo_cost(parcel, assumptions)
 

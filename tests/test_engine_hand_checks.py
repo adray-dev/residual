@@ -18,7 +18,15 @@ from engine.confidence import score_confidence
 from engine.envelope import resolve_envelope
 from engine.proforma import full_cashflow, screening_rlv
 from engine.program import fit_program
-from engine.prototypes import PROTOTYPES
+from engine.prototypes import (
+    ACTIVE_PROTOTYPES,
+    DISABLED_PROTOTYPES,
+    EXIT_CAP_ADJUSTMENT,
+    NATIONAL_HARD_COST_PSF,
+    PROTOTYPES,
+    RENT_PREMIUM_FACTOR,
+    hard_cost_psf,
+)
 from engine.solve import safe_irr, solve_irr_rlv
 from engine.types import ConstructionType, MarketData, NotPermitted, Parcel, Use, ZoningRules
 
@@ -42,9 +50,13 @@ def _market(rent=3.20, cap=0.055, hard=None, sid="noma"):
 
 
 # ---------------------------------------------------------------------------
-# (a) FAR-BINDING — the SPEC §4 scaffold parcel, midrise in MU-4.
+# (a) FAR-BINDING — the SPEC §4 scaffold parcel in MU-4.
+#
+# The prototype changed in v1.8 and the parcel did not. A 50 ft height cap is five
+# storeys, and five storeys is now the 5-over-1 band (4-7), not midrise (8-12) — so this
+# case also pins the new tier boundary from both sides.
 # ---------------------------------------------------------------------------
-def test_a_far_binding_midrise_screening_rlv():
+def test_a_far_binding_five_over_one_screening_rlv():
     parcel = Parcel(ssl="0123 0045", lot_area_sf=10_000, zone_code="MU-4",
                     submarket_id="noma", land_value=1_100_000,
                     improvement_value=200_000, land_use_code="vacant",
@@ -68,58 +80,69 @@ def test_a_far_binding_midrise_screening_rlv():
     assert env.max_floors == 5
     assert env.binding_constraint == "far"
 
-    prog = fit_program(env, PROTOTYPES["midrise"], rules, Use.RESIDENTIAL,
+    # The band partition, from the other side: at five storeys midrise is now out of range,
+    # so it cannot quietly come back as the answer to this case.
+    with pytest.raises(NotPermitted) as rejected:
+        fit_program(env, PROTOTYPES["midrise"], rules, Use.RESIDENTIAL,
+                    DEFAULT_ASSUMPTIONS, parcel)
+    assert str(rejected.value) == "midrise needs >= 8 stories; MU-4 allows 5 (gated by far)"
+
+    prog = fit_program(env, PROTOTYPES["5-over-1"], rules, Use.RESIDENTIAL,
                        DEFAULT_ASSUMPTIONS, parcel)
-    # PROGRAM HAND CHECK (midrise: 5-12 stories, min_lot 8,000, eff 0.80, podium)
-    #   lot 10,000 >= min_lot 8,000            -> admissible
-    #   min_stories 5 <= max_floors 5          -> admissible
-    #   floors    = min(12, 5)                          = 5
+    # PROGRAM HAND CHECK (5-over-1: 4-7 stories, min_lot 6,000, eff 0.85, podium)
+    #   lot 10,000 >= min_lot 6,000            -> admissible
+    #   min_stories 4 <= max_floors 5          -> admissible
+    #   floors    = min(7, 5)                           = 5
     #   gross_sf  = min(25,000, 6,000*5=30,000)         = 25,000
     #   no ground-floor mandate -> residential_gsf      = 25,000
-    #   net       = 25,000 * 0.80                       = 20,000
+    #   net       = 25,000 * 0.85                       = 21,250
     #   avg_sf    = .25*500 + .50*750 + .25*1050
     #             = 125 + 375 + 262.5                   = 762.5
-    #   units     = int(20,000 // 762.5) = int(26.229)  = 26
-    #   mix       = studio int(6.5)=6 | 1br int(13.0)=13 | 2br int(6.5)=6
-    #   stalls    = round(26 * 0.5) = round(13.0)       = 13
+    #   units     = int(21,250 // 762.5) = int(27.869)  = 27
+    #   mix       = studio int(6.75)=6 | 1br int(13.5)=13 | 2br int(6.75)=6
+    #   stalls    = round(27 * 0.5) = round(13.5)       = 14   (banker's: ties go even)
     assert prog.floors == 5
     assert prog.gross_sf == 25_000
-    assert prog.net_rentable_sf == 20_000
-    assert prog.unit_count == 26
+    assert prog.net_rentable_sf == 21_250
+    assert prog.unit_count == 27
     assert prog.unit_mix_counts == {"studio": 6, "1br": 13, "2br": 6}
-    assert prog.parking_stalls == 13
+    assert prog.parking_stalls == 14
     assert prog.retail_sf == 0.0
-    assert prog.construction_type == ConstructionType.CONCRETE_I
+    assert prog.construction_type == ConstructionType.WOOD_OVER_PODIUM
 
     out = screening_rlv(prog, market, DEFAULT_ASSUMPTIONS, parcel)
-    # RLV HAND CHECK — v1.4 product-type adjustment (§2.4) applies: midrise carries a
-    # 1.15 rent premium and a -25 bps cap adjustment off the submarket base.
-    #   rent_psf          = 3.20 * 1.15                       = 3.68
+    # RLV HAND CHECK — 5-over-1 carries midrise's product factors (1.40 premium, -25 bps)
+    # and wood-over-podium's cost. The REVENUE side is therefore identical to what midrise
+    # produced for this parcel in v1.7; only the shell is priced differently.
+    #   rent_psf          = 3.20 * 1.40                       = 4.48
     #   exit_cap          = 0.055 - 0.0025                    = 0.0525
-    #   gross_residential = 20,000 * 3.68 * 12                = 883,200
-    #   egi               = 883,200 * 0.94                    = 830,208
-    #   noi               = 830,208 * 0.65                    = 539,635.20
-    #   exit_value        = 539,635.20 / 0.0525               = 10,278,765.714286
-    #   hard shell        = 25,000 * 340                      = 8,500,000
-    #   hard parking      = 13 * 45,000 (podium)              =   585,000
-    #   hard              =                                     9,085,000
-    #   soft              = 9,085,000 * 0.20                  = 1,817,000
-    #   contingency       = 9,085,000 * 0.05                  =   454,250
-    #   cost_ex_land      =                                    11,356,250   (cost is unchanged)
-    #   profit            = 10,278,765.714286 * 0.15          = 1,541,814.857143
-    #   RLV = 10,278,765.714286 - 11,356,250 - 1,541,814.857143
-    #                                                         = -2,619,299.142857
-    #   gap = -2,619,299.142857 - 1,100,000                   = -3,719,299.142857
-    #   yoc = 539,635.20 / 11,356,250                         = 0.04751878
-    #   margin = (10,278,765.714286 - 11,356,250) / 11,356,250 = -0.09488029
-    # The premium+cap lift RLV by 1,484,936.31 vs the flat-rent model; still negative here,
-    # which is the point of case (a) — FAR-bound midrise at $3.20 base rent does not pencil.
-    assert out.screening_rlv == pytest.approx(-2_619_299.142857, abs=1.0)
-    assert out.feasibility_gap == pytest.approx(-3_719_299.142857, abs=1.0)
-    assert out.total_development_cost == pytest.approx(11_356_250, abs=1.0)
-    assert out.exit_value == pytest.approx(10_278_765.714286, abs=1.0)
-    assert out.yield_on_cost == pytest.approx(0.04751878, abs=1e-8)
-    assert out.profit_margin == pytest.approx(-0.09488029, abs=1e-8)
+    #   gross_residential = 21,250 * 4.48 * 12                = 1,142,400
+    #   egi               = 1,142,400 * 0.94                  = 1,073,856
+    #   noi               = 1,073,856 * 0.65                  =   698,006.40
+    #   exit_value        = 698,006.40 / 0.0525               = 13,295,360    (exact)
+    #   hard shell        = 25,000 * 260 (podium, not 340)    = 6,500,000
+    #   hard parking      = 14 * 45,000 (podium)              =   630,000
+    #   hard              =                                     7,130,000
+    #   soft              = 7,130,000 * 0.20                  = 1,426,000
+    #   contingency       = 7,130,000 * 0.05                  =   356,500
+    #   cost_ex_land      =                                     8,912,500
+    #   profit            = 13,295,360 * 0.15                 = 1,994,304
+    #   RLV = 13,295,360 - 8,912,500 - 1,994,304              = 2,388,556
+    #   gap = 2,388,556 - 1,100,000                           = 1,288,556
+    #   yoc = 698,006.40 / 8,912,500                          = 0.07831769
+    #   margin = (13,295,360 - 8,912,500) / 8,912,500         = 0.49176550
+    #
+    # This is the entire point of the v1.8 split, in one number. The identical building —
+    # same envelope, same 25,000 GSF, same 21,250 rentable, same rent, same cap — went from
+    # RLV -111,444 to +2,388,556 purely because five storeys are now priced as the wood
+    # they are built from ($260/SF) instead of as concrete ($340/SF). $2M of shell cost was
+    # a modeling artifact, and the feasibility sign flipped with it.
+    assert out.screening_rlv == pytest.approx(2_388_556.0, abs=1.0)
+    assert out.feasibility_gap == pytest.approx(1_288_556.0, abs=1.0)
+    assert out.total_development_cost == pytest.approx(8_912_500, abs=1.0)
+    assert out.exit_value == pytest.approx(13_295_360.0, abs=1.0)
+    assert out.yield_on_cost == pytest.approx(0.07831769, abs=1e-8)
+    assert out.profit_margin == pytest.approx(0.49176550, abs=1e-8)
 
 
 # ---------------------------------------------------------------------------
@@ -234,10 +257,18 @@ def test_c_midrise_rejected_by_story_count():
     assert env.binding_constraint == "height"
 
     # lot 10,000 >= midrise min_lot 8,000, so the lot gate passes and the story gate fires.
+    # v1.8 raised midrise's floor from 5 storeys to 8.
     with pytest.raises(NotPermitted) as exc:
         fit_program(env, PROTOTYPES["midrise"], rules, Use.RESIDENTIAL,
                     DEFAULT_ASSUMPTIONS, parcel)
-    assert str(exc.value) == "midrise needs >= 5 stories; TEST-L allows 4 (gated by height)"
+    assert str(exc.value) == "midrise needs >= 8 stories; TEST-L allows 4 (gated by height)"
+
+    # And the band below it picks the parcel up: four storeys is 5-over-1's minimum, so
+    # raising midrise's floor did not leave a hole in the height range.
+    prog = fit_program(env, PROTOTYPES["5-over-1"], rules, Use.RESIDENTIAL,
+                       DEFAULT_ASSUMPTIONS, parcel)
+    assert prog.floors == 4
+    assert prog.construction_type == ConstructionType.WOOD_OVER_PODIUM
 
 
 def test_c_use_not_permitted():
@@ -283,42 +314,46 @@ def test_d_negative_rlv_highrise():
 
     prog = fit_program(env, PROTOTYPES["highrise"], rules, Use.RESIDENTIAL,
                        DEFAULT_ASSUMPTIONS, parcel)
-    # PROGRAM HAND CHECK (highrise: 12-30 stories, min_lot 12,000, eff 0.75, structured)
-    #   floors   = min(30, 13)                          = 13
+    # PROGRAM HAND CHECK (highrise: 13-30 stories, min_lot 12,000, eff 0.85, structured)
+    #   floors   = min(30, 13)                          = 13   (exactly at the v1.8 floor)
     #   gross_sf = min(150,000, 15,000*13=195,000)      = 150,000
-    #   net      = 150,000 * 0.75                       = 112,500
+    #   net      = 150,000 * 0.85                       = 127,500
     #   avg_sf   = .30*480 + .50*720 + .20*1000
     #            = 144 + 360 + 200                      = 704
-    #   units    = int(112,500 // 704) = int(159.801)   = 159
-    #   stalls   = round(159 * 0.25) = round(39.75)     = 40
+    #   units    = int(127,500 // 704) = int(181.107)   = 181
+    #   stalls   = round(181 * 0.25) = round(45.25)     = 45
     assert prog.floors == 13
     assert prog.gross_sf == 150_000
-    assert prog.net_rentable_sf == pytest.approx(112_500)
-    assert prog.unit_count == 159
-    assert prog.parking_stalls == 40
+    assert prog.net_rentable_sf == pytest.approx(127_500)
+    assert prog.unit_count == 181
+    assert prog.parking_stalls == 45
 
-    # RLV HAND CHECK — highrise concrete priced at the §5 national fallback of $430/SF,
-    # with the v1.4 product-type adjustment: 1.30 rent premium, -50 bps cap.
-    #   rent_psf          = 2.50 * 1.30               =  3.25
+    # RLV HAND CHECK — this market overrides concrete to $430/SF, and highrise then carries
+    # the v1.8 height factor on top of it (§5 HARD_COST_FACTOR = 1.0625): the same concrete
+    # system costs more to build tall.
+    #   hard $/SF         = 430 * 1.0625              =    456.875
+    #   rent_psf          = 2.50 * 1.60               =  4.00
     #   exit_cap          = 0.065 - 0.0050            =  0.060
-    #   gross_residential = 112,500 * 3.25 * 12       =  4,387,500
-    #   egi               = 4,387,500 * 0.94          =  4,124,250
-    #   noi               = 4,124,250 * 0.65          =  2,680,762.50
-    #   exit_value        = 2,680,762.50 / 0.060      = 44,679,375  (exact)
-    #   hard shell        = 150,000 * 430             = 64,500,000
-    #   hard parking      = 40 * 35,000 (structured)  =  1,400,000
-    #   hard              =                             65,900,000
-    #   soft              = 65,900,000 * 0.20         = 13,180,000
-    #   contingency       = 65,900,000 * 0.05         =  3,295,000
-    #   cost_ex_land      =                             82,375,000
-    #   profit            = 44,679,375 * 0.15         =  6,701,906.25
-    #   RLV = 44,679,375 - 82,375,000 - 6,701,906.25  = -44,397,531.25
-    #   gap = -44,397,531.25 - 3,000,000              = -47,397,531.25
-    # Deeply negative even with the premium: $2.50 base rent cannot carry $430/SF concrete.
-    # That is the case this test exists to pin — the premium moves the number, not the sign.
+    #   gross_residential = 127,500 * 4.00 * 12       =  6,120,000
+    #   egi               = 6,120,000 * 0.94          =  5,752,800
+    #   noi               = 5,752,800 * 0.65          =  3,739,320
+    #   exit_value        = 3,739,320 / 0.060         = 62,322,000  (exact)
+    #   hard shell        = 150,000 * 456.875         = 68,531,250
+    #   hard parking      = 45 * 35,000 (structured)  =  1,575,000
+    #   hard              =                             70,106,250
+    #   soft              = 70,106,250 * 0.20         = 14,021,250
+    #   contingency       = 70,106,250 * 0.05         =  3,505,312.50
+    #   cost_ex_land      =                             87,632,812.50
+    #   profit            = 62,322,000 * 0.15         =  9,348,300
+    #   RLV = 62,322,000 - 87,632,812.50 - 9,348,300  = -34,659,112.50
+    #   gap = -34,659,112.50 - 3,000,000              = -37,659,112.50
+    # Still deeply negative, which is the whole point of case (d): $2.50 base rent cannot
+    # carry $430/SF concrete at any premium. v1.8 moved it FURTHER under, not closer — the
+    # efficiency gain (0.80 -> 0.85) adds revenue, and the height factor adds more cost than
+    # the revenue is worth. The tier split is not a subsidy for going tall.
     out = screening_rlv(prog, market, DEFAULT_ASSUMPTIONS, parcel)
-    assert out.screening_rlv == pytest.approx(-44_397_531.25, abs=1.0)
-    assert out.feasibility_gap == pytest.approx(-47_397_531.25, abs=1.0)
+    assert out.screening_rlv == pytest.approx(-34_659_112.50, abs=1.0)
+    assert out.feasibility_gap == pytest.approx(-37_659_112.50, abs=1.0)
     assert out.feasibility_gap < 0
 
 
@@ -342,7 +377,7 @@ def _gfa_case():
     return parcel, rules
 
 
-def test_e_ground_floor_active_carveout_applies_to_midrise():
+def test_e_ground_floor_active_carveout_applies_to_five_over_one():
     parcel, rules = _gfa_case()
     env = resolve_envelope(parcel, rules, Use.RESIDENTIAL, DEFAULT_ASSUMPTIONS)
     # ENVELOPE HAND CHECK
@@ -355,42 +390,52 @@ def test_e_ground_floor_active_carveout_applies_to_midrise():
     assert env.max_buildable_gsf == 72_000
     assert env.binding_constraint == "height"
 
-    prog = fit_program(env, PROTOTYPES["midrise"], rules, Use.RESIDENTIAL,
+    # Six storeys is the 5-over-1 band in v1.8. It is in GROUND_FLOOR_ACTIVE_PROTOTYPES —
+    # the most literal member of that set, since the "1" in the name IS the podium.
+    prog = fit_program(env, PROTOTYPES["5-over-1"], rules, Use.RESIDENTIAL,
                        DEFAULT_ASSUMPTIONS, parcel)
     # PROGRAM HAND CHECK
-    #   floors             = min(12, 6)                           = 6
+    #   floors             = min(7, 6)                            = 6
     #   gross_sf           = min(72,000, 12,000 * 6)              = 72,000
     #   required_active_sf = min(footprint 12,000, gross 72,000)  = 12,000
     #   residential_gsf    = 72,000 - 12,000                      = 60,000
-    #   net                = 60,000 * 0.80                        = 48,000
+    #   net                = 60,000 * 0.85                        = 51,000
     #   avg_sf   = 0.25*500 + 0.50*750 + 0.25*1050                = 762.5
-    #   units    = int(48,000 // 762.5) = int(62.95)              = 62
-    #   stalls   = round(62 * 1.0)                                = 62
+    #   units    = int(51,000 // 762.5) = int(66.885)             = 66
+    #   stalls   = round(66 * 1.0)                                = 66
     #   gross_sf stays 72,000 -> the shell IS costed
     assert prog.gross_sf == 72_000
     assert prog.retail_sf == 12_000
-    assert prog.net_rentable_sf == pytest.approx(48_000)
-    assert prog.unit_count == 62
-    assert prog.parking_stalls == 62
+    assert prog.net_rentable_sf == pytest.approx(51_000)
+    assert prog.unit_count == 66
+    assert prog.parking_stalls == 66
 
     out = screening_rlv(prog, _market(), DEFAULT_ASSUMPTIONS, parcel)
-    # RLV HAND CHECK — midrise, so the v1.4 premium (1.15) and cap adjustment (-25 bps) apply
-    #   rent_psf          = 3.20 * 1.15                  =  3.68
+    # RLV HAND CHECK — 5-over-1 carries the 1.40 premium and -25 bps, same as midrise, and
+    # wood-over-podium's $260/SF. Efficiency 0.85 applies to the RESIDENTIAL gross only: the
+    # mandated ground floor is carved out above, so the 12,000 SF is costed at full shell
+    # and never enters net.
+    #   rent_psf          = 3.20 * 1.40                  =  4.48
     #   exit_cap          = 0.055 - 0.0025               =  0.0525
-    #   gross_residential = 48,000 * 3.68 * 12           =  2,119,680
-    #   egi               = 2,119,680 * 0.94             =  1,992,499.20
-    #   noi               = 1,992,499.20 * 0.65          =  1,295,124.48
-    #   exit_value        = 1,295,124.48 / 0.0525        = 24,669,037.714286
-    #   hard shell        = 72,000 * 340 (FULL gross)    = 24,480,000
-    #   hard parking      = 62 * 45,000 (podium)         =  2,790,000
-    #   hard              =                                27,270,000
-    #   soft              = 27,270,000 * 0.20            =  5,454,000
-    #   contingency       = 27,270,000 * 0.05            =  1,363,500
-    #   cost_ex_land      =                                34,087,500
-    #   profit            = 24,669,037.714286 * 0.15     =  3,700,355.657143
-    #   RLV = 24,669,037.714286 - 34,087,500 - 3,700,355.657143
-    #                                                    = -13,118,817.942857
-    assert out.screening_rlv == pytest.approx(-13_118_817.942857, abs=1.0)
+    #   gross_residential = 51,000 * 4.48 * 12           =  2,741,760
+    #   egi               = 2,741,760 * 0.94             =  2,577,254.40
+    #   noi               = 2,577,254.40 * 0.65          =  1,675,215.36
+    #   exit_value        = 1,675,215.36 / 0.0525        = 31,908,864    (exact)
+    #   hard shell        = 72,000 * 260 (FULL gross)    = 18,720,000
+    #   hard parking      = 66 * 45,000 (podium)         =  2,970,000
+    #   hard              =                                21,690,000
+    #   soft              = 21,690,000 * 0.20            =  4,338,000
+    #   contingency       = 21,690,000 * 0.05            =  1,084,500
+    #   cost_ex_land      =                                27,112,500
+    #   profit            = 31,908,864 * 0.15            =  4,786,329.60
+    #   RLV = 31,908,864 - 27,112,500 - 4,786,329.60     =     10,034.40
+    #
+    # Barely positive, where the same case priced as concrete was -7.19M. Worth keeping in
+    # view: the mandate still costs this parcel its whole margin — a 12,000 SF ground floor
+    # costed at full shell and earning nothing leaves an RLV of ten thousand dollars on a
+    # $27M build, and the feasibility gap against a $1M assessed value is still negative.
+    assert out.screening_rlv == pytest.approx(10_034.40, abs=1.0)
+    assert out.feasibility_gap == pytest.approx(-989_965.60, abs=1.0)
 
 
 @pytest.mark.parametrize("proto_id", ["townhome", "garden"])
@@ -488,7 +533,10 @@ def test_confidence_is_provenance_weighted():
     #
     # The size is pinned because every input dilutes confidence on every parcel in the
     # city: changing it is allowed, but it needs a re-bake and a deliberate edit here
-    # rather than passing silently. 27 as of v1.6 (`irr_hurdle` added, §2.6).
+    # rather than passing silently. 27 as of v1.6 (`irr_hurdle` added, §2.6). v1.7 changed
+    # the VALUES of the product-type factors but added no key, so the count is unmoved —
+    # and efficiency_ratio is not in here at all, being a prototype attribute rather than a
+    # market input. §11 records that as a gap in what confidence can see.
     assert len(PROVENANCE) == 27
     assert set(PROVENANCE.values()) == {"national"}
     assert score_confidence(PROVENANCE) == 0.0
@@ -651,3 +699,301 @@ def test_s_curve_fractions_sum_to_one():
         assert len(f) == n
         assert f.sum() == pytest.approx(1.0)
         assert np.all(f > 0)
+
+
+# ---------------------------------------------------------------------------
+# The v1 product set. Pinned, because "which prototypes compete" is a product decision
+# that the bake reads without announcing, and both directions of drift are silent:
+# un-benching garden would put a dominated product back on the map, and benching another
+# would shrink the library with nothing failing.
+# ---------------------------------------------------------------------------
+def test_garden_is_defined_but_benched():
+    # Defined: the library is still complete, so a stored row or an old batch naming garden
+    # can be looked up rather than crashing.
+    assert set(PROTOTYPES) == {"townhome", "garden", "5-over-1", "midrise", "highrise"}
+    assert PROTOTYPES["garden"].efficiency_ratio == 0.85
+
+    # Benched: it is not a candidate, so it can never be `is_best`.
+    assert DISABLED_PROTOTYPES == frozenset({"garden"})
+    assert set(ACTIVE_PROTOTYPES) == {"townhome", "5-over-1", "midrise", "highrise"}
+    assert "garden" not in ACTIVE_PROTOTYPES
+    assert ACTIVE_PROTOTYPES["townhome"] is PROTOTYPES["townhome"]
+
+
+def test_the_story_bands_are_contiguous_and_non_overlapping():
+    """No overlaps and no gaps across the ACTIVE set (§5).
+
+    This constrains what each tier BUILDS, not which tiers are ADMISSIBLE — admissibility
+    is `min_stories <= envelope.max_floors`, so a tall envelope admits several tiers at
+    once and they compete on RLV (see `test_tall_envelopes_admit_several_tiers`). What the
+    bands guarantee is that no two tiers can produce the same building height, and that no
+    height between 2 and 30 is left without a product that tops out at it.
+
+    Garden is excluded because it is benched — its 2-4 band overlaps two others, which is
+    part of why it cannot compete.
+    """
+    bands = sorted(
+        (p.min_stories, p.max_stories, pid) for pid, p in ACTIVE_PROTOTYPES.items()
+    )
+    assert bands == [
+        (2, 3, "townhome"),
+        (4, 7, "5-over-1"),
+        (8, 12, "midrise"),
+        (13, 30, "highrise"),
+    ]
+    for (_, upper, _), (lower, _, _) in zip(bands, bands[1:]):
+        assert lower == upper + 1
+
+
+def test_tall_envelopes_admit_several_tiers():
+    """The corrective to reading the bands as a partition of admissibility.
+
+    A 9-floor envelope admits townhome, 5-over-1 AND midrise; each builds to its own cap
+    and the pro forma picks. Pinned because the tempting "simplification" — snapping a
+    parcel to the single tier whose band contains `max_floors` — would silently force the
+    tallest option and rebuild the v1.7 defect (density winning by construction) in a new
+    place.
+    """
+    parcel = Parcel(ssl="2873 1110", lot_area_sf=116_161, zone_code="RA-5",
+                    submarket_id="ward1", land_value=5_000_000,
+                    improvement_value=0, land_use_code="vacant", improvement_ratio=0.0)
+    rules = ZoningRules(district_code="RA-5", max_far=6.0, max_height_ft=90,
+                        max_stories=None,
+                        lot_occupancy_pct={"residential": 0.80, "other": 0.80},
+                        permitted_uses=[Use.RESIDENTIAL],
+                        parking_ratio={"residential": 0.5})
+    env = resolve_envelope(parcel, rules, Use.RESIDENTIAL, DEFAULT_ASSUMPTIONS)
+    assert env.max_floors == 9
+
+    built = {}
+    for pid in ("townhome", "5-over-1", "midrise"):
+        prog = fit_program(env, PROTOTYPES[pid], rules, Use.RESIDENTIAL,
+                           DEFAULT_ASSUMPTIONS, parcel)
+        built[pid] = prog.floors
+    # Each stops at its OWN ceiling, not the envelope's.
+    assert built == {"townhome": 3, "5-over-1": 7, "midrise": 9}
+
+    # 13 > 9, so the one tier whose band starts above the envelope is genuinely out.
+    with pytest.raises(NotPermitted):
+        fit_program(env, PROTOTYPES["highrise"], rules, Use.RESIDENTIAL,
+                    DEFAULT_ASSUMPTIONS, parcel)
+
+    # And the shorter wood building beats the taller concrete one, which is the whole
+    # economic claim of the v1.8 split.
+    market = _market(rent=3.40, cap=0.05)
+    rlv = {
+        pid: screening_rlv(
+            fit_program(env, PROTOTYPES[pid], rules, Use.RESIDENTIAL,
+                        DEFAULT_ASSUMPTIONS, parcel),
+            market, DEFAULT_ASSUMPTIONS, parcel,
+        ).screening_rlv
+        for pid in built
+    }
+    assert rlv["5-over-1"] > rlv["midrise"] > rlv["townhome"]
+
+
+def test_cost_tables_agree():
+    """`NATIONAL_HARD_COST_PSF` must equal construction-type cost x height factor.
+
+    Two tables describing the same dollars is a drift risk, and the per-prototype one is
+    only a fallback — so it is the one that would go stale unnoticed while the pro forma
+    quietly used the other.
+    """
+    from data.loaders.seed_market import FALLBACK_COST_PSF
+
+    for pid, proto in PROTOTYPES.items():
+        base = FALLBACK_COST_PSF[proto.construction_type.value]
+        assert hard_cost_psf(base, pid) == pytest.approx(NATIONAL_HARD_COST_PSF[pid]), pid
+
+    # The requested v1.8 schedule, spelled out so a silent edit to either table fails here.
+    assert NATIONAL_HARD_COST_PSF["townhome"] == 220
+    assert NATIONAL_HARD_COST_PSF["5-over-1"] == 260
+    assert NATIONAL_HARD_COST_PSF["midrise"] == 320
+    assert NATIONAL_HARD_COST_PSF["highrise"] == 340
+    # Same structural system, different price — that is the factor's whole job.
+    assert (
+        PROTOTYPES["midrise"].construction_type
+        == PROTOTYPES["highrise"].construction_type
+    )
+
+
+def test_the_two_multifamily_tiers_are_one_product_to_the_user():
+    """5-over-1 and midrise differ ONLY in how they are built, never in how they sell."""
+    from api.vocabulary import PROTOTYPE_LABELS
+
+    assert RENT_PREMIUM_FACTOR["5-over-1"] == RENT_PREMIUM_FACTOR["midrise"]
+    assert EXIT_CAP_ADJUSTMENT["5-over-1"] == EXIT_CAP_ADJUSTMENT["midrise"]
+    assert (
+        PROTOTYPES["5-over-1"].efficiency_ratio == PROTOTYPES["midrise"].efficiency_ratio
+    )
+    assert (
+        PROTOTYPES["5-over-1"].default_unit_mix == PROTOTYPES["midrise"].default_unit_mix
+    )
+    # ...and they cost different amounts, which is the reason they are separate at all.
+    assert NATIONAL_HARD_COST_PSF["5-over-1"] != NATIONAL_HARD_COST_PSF["midrise"]
+
+    # One user-facing name over both, and three labels over the four active prototypes.
+    assert PROTOTYPE_LABELS["5-over-1"] == PROTOTYPE_LABELS["midrise"] == "Multifamily"
+    assert {PROTOTYPE_LABELS[pid] for pid in ACTIVE_PROTOTYPES} == {
+        "Townhome", "Multifamily", "High-rise",
+    }
+
+
+def test_garden_is_no_longer_dominated_and_the_bench_is_now_a_product_choice():
+    """The bench outlived its original justification. This test says so out loud.
+
+    History, because it matters for whether the bench should survive:
+      v1.7  townhome premium 1.15, garden 1.00 -> garden dominated on every axis; it won
+            0 of the 2,503 parcels it was admissible on. Benching cost nothing.
+      v1.8  townhome returned to 1.00 -> equal rent, garden losing only on efficiency and
+            the fourth floor's cost. Still dominated, by 5.9%.
+      v1.9  townhome cut to 0.90 -> garden now EARNS MORE per dollar of shell than
+            townhome. Measured over the real bake with the full library ranked on
+            rlv_total, garden takes 1,679 of 79,073 scored parcels (67% of its admissible
+            set), beating townhome on 1,604 of them and 5-over-1 on 75.
+
+    So `DISABLED_PROTOTYPES` is no longer hiding a product that cannot win. It is hiding
+    1,679 parcels whose best build is a garden walk-up and which currently display as
+    something else. That may still be the right product call — three build types demo
+    better than four — but it is a presentation decision now, not a modeling one, and
+    §11 records it as such.
+    """
+    town, garden = PROTOTYPES["townhome"], PROTOTYPES["garden"]
+    town_rev = town.max_stories * town.efficiency_ratio * RENT_PREMIUM_FACTOR["townhome"]
+    garden_rev = garden.max_stories * garden.efficiency_ratio * RENT_PREMIUM_FACTOR["garden"]
+    town_cost = town.max_stories * NATIONAL_HARD_COST_PSF["townhome"]
+    garden_cost = garden.max_stories * NATIONAL_HARD_COST_PSF["garden"]
+
+    assert RENT_PREMIUM_FACTOR["townhome"] == 0.90
+    assert RENT_PREMIUM_FACTOR["garden"] == 1.00
+    assert town_rev == pytest.approx(2.43)      # 3 x 0.90 x 0.90
+    assert garden_rev == pytest.approx(3.40)    # 4 x 0.85 x 1.00
+    assert (town_cost, garden_cost) == (660, 880)
+
+    # The flip. Garden now returns ~4.9% more revenue-area per dollar of shell.
+    assert garden_rev / garden_cost > town_rev / town_cost
+    assert (garden_rev / garden_cost) / (town_rev / town_cost) == pytest.approx(
+        1.049, abs=5e-4
+    )
+
+    # Benched regardless — deliberately, and this is the line to delete to bring it back.
+    assert DISABLED_PROTOTYPES == frozenset({"garden"})
+
+
+def test_the_story_bands_are_contiguous_and_non_overlapping():
+    """No overlaps and no gaps across the ACTIVE set (§5).
+
+    This constrains what each tier BUILDS, not which tiers are ADMISSIBLE — admissibility
+    is `min_stories <= envelope.max_floors`, so a tall envelope admits several tiers at
+    once and they compete on RLV (see `test_tall_envelopes_admit_several_tiers`). What the
+    bands guarantee is that no two tiers can produce the same building height, and that no
+    height between 2 and 30 is left without a product that tops out at it.
+
+    Garden is excluded because it is benched — its 2-4 band overlaps two others, which is
+    part of why it cannot compete.
+    """
+    bands = sorted(
+        (p.min_stories, p.max_stories, pid) for pid, p in ACTIVE_PROTOTYPES.items()
+    )
+    assert bands == [
+        (2, 3, "townhome"),
+        (4, 7, "5-over-1"),
+        (8, 12, "midrise"),
+        (13, 30, "highrise"),
+    ]
+    for (_, upper, _), (lower, _, _) in zip(bands, bands[1:]):
+        assert lower == upper + 1
+
+
+def test_tall_envelopes_admit_several_tiers():
+    """The corrective to reading the bands as a partition of admissibility.
+
+    A 9-floor envelope admits townhome, 5-over-1 AND midrise; each builds to its own cap
+    and the pro forma picks. Pinned because the tempting "simplification" — snapping a
+    parcel to the single tier whose band contains `max_floors` — would silently force the
+    tallest option and rebuild the v1.7 defect (density winning by construction) in a new
+    place.
+    """
+    parcel = Parcel(ssl="2873 1110", lot_area_sf=116_161, zone_code="RA-5",
+                    submarket_id="ward1", land_value=5_000_000,
+                    improvement_value=0, land_use_code="vacant", improvement_ratio=0.0)
+    rules = ZoningRules(district_code="RA-5", max_far=6.0, max_height_ft=90,
+                        max_stories=None,
+                        lot_occupancy_pct={"residential": 0.80, "other": 0.80},
+                        permitted_uses=[Use.RESIDENTIAL],
+                        parking_ratio={"residential": 0.5})
+    env = resolve_envelope(parcel, rules, Use.RESIDENTIAL, DEFAULT_ASSUMPTIONS)
+    assert env.max_floors == 9
+
+    built = {}
+    for pid in ("townhome", "5-over-1", "midrise"):
+        prog = fit_program(env, PROTOTYPES[pid], rules, Use.RESIDENTIAL,
+                           DEFAULT_ASSUMPTIONS, parcel)
+        built[pid] = prog.floors
+    # Each stops at its OWN ceiling, not the envelope's.
+    assert built == {"townhome": 3, "5-over-1": 7, "midrise": 9}
+
+    # 13 > 9, so the one tier whose band starts above the envelope is genuinely out.
+    with pytest.raises(NotPermitted):
+        fit_program(env, PROTOTYPES["highrise"], rules, Use.RESIDENTIAL,
+                    DEFAULT_ASSUMPTIONS, parcel)
+
+    # And the shorter wood building beats the taller concrete one, which is the whole
+    # economic claim of the v1.8 split.
+    market = _market(rent=3.40, cap=0.05)
+    rlv = {
+        pid: screening_rlv(
+            fit_program(env, PROTOTYPES[pid], rules, Use.RESIDENTIAL,
+                        DEFAULT_ASSUMPTIONS, parcel),
+            market, DEFAULT_ASSUMPTIONS, parcel,
+        ).screening_rlv
+        for pid in built
+    }
+    assert rlv["5-over-1"] > rlv["midrise"] > rlv["townhome"]
+
+
+def test_cost_tables_agree():
+    """`NATIONAL_HARD_COST_PSF` must equal construction-type cost x height factor.
+
+    Two tables describing the same dollars is a drift risk, and the per-prototype one is
+    only a fallback — so it is the one that would go stale unnoticed while the pro forma
+    quietly used the other.
+    """
+    from data.loaders.seed_market import FALLBACK_COST_PSF
+
+    for pid, proto in PROTOTYPES.items():
+        base = FALLBACK_COST_PSF[proto.construction_type.value]
+        assert hard_cost_psf(base, pid) == pytest.approx(NATIONAL_HARD_COST_PSF[pid]), pid
+
+    # The requested v1.8 schedule, spelled out so a silent edit to either table fails here.
+    assert NATIONAL_HARD_COST_PSF["townhome"] == 220
+    assert NATIONAL_HARD_COST_PSF["5-over-1"] == 260
+    assert NATIONAL_HARD_COST_PSF["midrise"] == 320
+    assert NATIONAL_HARD_COST_PSF["highrise"] == 340
+    # Same structural system, different price — that is the factor's whole job.
+    assert (
+        PROTOTYPES["midrise"].construction_type
+        == PROTOTYPES["highrise"].construction_type
+    )
+
+
+def test_the_two_multifamily_tiers_are_one_product_to_the_user():
+    """5-over-1 and midrise differ ONLY in how they are built, never in how they sell."""
+    from api.vocabulary import PROTOTYPE_LABELS
+
+    assert RENT_PREMIUM_FACTOR["5-over-1"] == RENT_PREMIUM_FACTOR["midrise"]
+    assert EXIT_CAP_ADJUSTMENT["5-over-1"] == EXIT_CAP_ADJUSTMENT["midrise"]
+    assert (
+        PROTOTYPES["5-over-1"].efficiency_ratio == PROTOTYPES["midrise"].efficiency_ratio
+    )
+    assert (
+        PROTOTYPES["5-over-1"].default_unit_mix == PROTOTYPES["midrise"].default_unit_mix
+    )
+    # ...and they cost different amounts, which is the reason they are separate at all.
+    assert NATIONAL_HARD_COST_PSF["5-over-1"] != NATIONAL_HARD_COST_PSF["midrise"]
+
+    # One user-facing name over both, and three labels over the four active prototypes.
+    assert PROTOTYPE_LABELS["5-over-1"] == PROTOTYPE_LABELS["midrise"] == "Multifamily"
+    assert {PROTOTYPE_LABELS[pid] for pid in ACTIVE_PROTOTYPES} == {
+        "Townhome", "Multifamily", "High-rise",
+    }
