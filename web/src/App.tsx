@@ -41,6 +41,7 @@ import { Vocabulary } from "./lib/vocabulary";
 import { EMPTY_FILTERS, mapFilter, type FilterState } from "./lib/filters";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
 import { Filters } from "./components/Filters";
+import { ResidualMark } from "./components/ResidualMark";
 import { Legend } from "./components/Legend";
 import { MapView } from "./components/MapView";
 import { Popup } from "./components/Popup";
@@ -368,7 +369,7 @@ export function App() {
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
-        <Logo />
+        <ResidualMark size={24} />
         <span className={styles.wordmark}>Residual</span>
         {vocab && (
           <Search
@@ -586,18 +587,5 @@ export function App() {
         />
       )}
     </div>
-  );
-}
-
-/** The handoff's mark: building massing on a ground line. Inline SVG, no icon font. */
-function Logo() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true">
-      <rect width="26" height="26" rx="7" fill="var(--accent)" />
-      <rect x="6" y="13" width="4" height="7" fill="#fff" opacity=".5" />
-      <rect x="11.5" y="9" width="4" height="11" fill="#fff" opacity=".78" />
-      <rect x="17" y="5.5" width="4" height="14.5" fill="#fff" />
-      <rect x="5" y="21.5" width="16" height="1.6" rx=".8" fill="#fff" opacity=".92" />
-    </svg>
   );
 }

@@ -13,6 +13,9 @@
   --accent-mid: #4fa39d;
   --accent-mid-2: #2c918c;
   --accent-tint: #eaf2f1;     /* selected chips, "best" tags */
+  /* Logo only — the mark's one residual lot. Deliberately outside both the value ramp and
+     the semantic set: nothing in the interface may use it. */
+  --brand-magenta: #c4187e;
 
   /* --- color: ink --------------------------------------------------------- */
   --ink: #1a1d1c;             /* primary text, dark buttons, selection ring */
