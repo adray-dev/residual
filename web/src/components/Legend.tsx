@@ -50,10 +50,17 @@ export function Legend({
   const [collapsed, setCollapsed] = useState(true);
 
   const ramp = meta.ramps[objective];
-  // Rounded outward, and by the same function the filter slider uses — the two print the
-  // same domain a few hundred pixels apart, so they have to agree. Note this rounds
-  // per-objective: the totals go to $10M, the per-SF figures to $10.
-  const domain = roundedDomain(ramp?.min, ramp?.max);
+  // Rounded for total RLV only, by the same function the filter slider uses: those two
+  // print the same domain a few hundred pixels apart and have to agree, and a slider whose
+  // track ended at -$103,720,782 would be reporting the extreme parcel rather than a range.
+  //
+  // Nothing governs the per-SF ramp but the ramp itself, so there is nothing to agree with,
+  // and it reports what the bake actually holds — -$132/SF is a readable number already,
+  // and rounding it to -$140 would only move the label away from the data for no gain.
+  const domain =
+    objective === "rlv_total"
+      ? roundedDomain(ramp?.min, ramp?.max)
+      : { floor: ramp?.min ?? NaN, ceiling: ramp?.max ?? NaN };
   const negative = ramp?.negative_count ?? 0;
   const positive = ramp?.positive_count ?? 0;
   const scored = negative + positive;

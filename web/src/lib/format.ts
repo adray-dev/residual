@@ -55,10 +55,15 @@ export function count(value: number | null | undefined): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
-/** "$3.20" — per-SF rents, which are small enough that compacting would destroy them. */
+/** "$3.20" — per-SF rents, which are small enough that compacting would destroy them.
+ *
+ * The sign leads, as it does in `money`: a negative belongs outside the currency symbol,
+ * and "$-132" reads as a typo. Only the legend's per-SF minimum is ever negative — rents
+ * are not — so this changes one number on screen and guards the rest. */
 export function rate(value: number | null | undefined, decimals = 2): string {
   if (value == null || !Number.isFinite(value)) return NO_VALUE;
-  return `$${value.toFixed(decimals)}`;
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(value).toFixed(decimals)}`;
 }
 
 /** Confidence, and ONLY as a percentage. `confidence` on the wire is a 0-1 fraction. */
