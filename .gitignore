@@ -18,3 +18,5 @@ dist/
 Interactive Map Product Wireframe.zip
 *.tsbuildinfo
 Residual Real Estate Logo.zip
+.vercel
+.env*

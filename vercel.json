@@ -1,9 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/main.py": {
-      "maxDuration": 120,
-      "excludeFiles": "{web/**,tests/**,.venv/**,tiles/build/**,design_handoff_parcel_feasibility_map/**,data/loaders/**,**/*.pmtiles,**/*.mbtiles,**/*.zip,**/__pycache__/**}"
+  "services": {
+    "api": {
+      "root": "./",
+      "entrypoint": "api.main:app",
+      "functions": {
+        "api/main.py": {
+          "maxDuration": 120,
+          "excludeFiles": "{web/**,tests/**,.venv/**,tiles/build/**,design_handoff_parcel_feasibility_map/**,data/loaders/**,**/*.pmtiles,**/*.mbtiles,**/*.zip,**/__pycache__/**}"
+        }
+      }
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "api" } }
+  ]
 }

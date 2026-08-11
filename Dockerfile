@@ -1,8 +1,9 @@
 # The API image. Serving only — no loaders, no bake, no tippecanoe.
 #
 # `pip install .[api]` deliberately skips the `data` extra: geopandas, shapely and pyproj
-# are loader-only and are most of the install size. `data/repositories.py` needs psycopg
-# and python-dotenv, and those are declared on the `api` extra for exactly this reason.
+# are loader-only and are most of the install size. The serving libraries themselves are
+# base dependencies now, so the `[api]` extra adds only uvicorn — the server this image
+# runs and a serverless function does not.
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \

@@ -60,9 +60,15 @@ look broken — it is a sequential scan over every geometry on each keystroke.
 
 ### 2. API
 
-A Vercel project with **root directory `.`** (the repo root). It reads the root
-`vercel.json` and `requirements.txt`; `pyproject.toml`'s `[tool.vercel] entrypoint` names
-`api.main:app` as the function.
+A Vercel project with **root directory `.`** (the repo root), configured as a service in
+the root `vercel.json`. `pyproject.toml` drives both halves of the build: `[tool.vercel]
+entrypoint` names `api.main:app`, and `[project] dependencies` is the install list.
+
+That install list is why the serving libraries are base dependencies rather than sitting
+behind the `api` extra — Vercel installs `[project] dependencies` and does not resolve
+extras. A `requirements.txt` does not help; pyproject takes precedence and the file is
+ignored outright, which fails at runtime as `ModuleNotFoundError: No module named
+'fastapi'` rather than at build time.
 
 Environment variables — set the first now, the other two after step 3:
 

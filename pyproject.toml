@@ -3,10 +3,23 @@ name = "feasibility"
 version = "0.1.0"
 description = "Per-parcel development feasibility engine (DC pilot)"
 requires-python = ">=3.11"
+# Everything the app needs to SERVE a request, and nothing else. Vercel installs exactly
+# this list — it reads `[project] dependencies` and does not resolve extras, so anything
+# the API imports at runtime has to be declared here rather than behind an extra. The
+# loader-only packages are still optional; they are most of the install size and the
+# serving path never imports them.
 dependencies = [
+  # Engine — pure computation, no I/O.
   "numpy>=1.26",
   "numpy-financial>=1.0",
   "scipy>=1.11",
+  # API surface.
+  "fastapi>=0.110",
+  "openpyxl>=3.1",        # the live-formula Excel export (api/workbook.py)
+  # data/repositories.py, which is the only module that touches the database.
+  "psycopg[binary]>=3.1",
+  "psycopg-pool>=3.2",
+  "python-dotenv>=1.0",   # repositories.py auto-loads .env for every entry point
 ]
 
 [project.optional-dependencies]
@@ -20,15 +33,11 @@ data = [
   "requests>=2.31",
 ]
 api = [
-  "openpyxl>=3.1",       # the live-formula Excel export (api/workbook.py)
-  "fastapi>=0.110",
+  # Only the server. The API's actual libraries moved to `[project] dependencies` above
+  # so that Vercel, which installs from that list alone, gets them. What is left here is
+  # what a container needs and a function does not: Vercel invokes the ASGI app directly,
+  # so it never runs uvicorn. `pip install .[api]` still builds the serving image.
   "uvicorn>=0.29",
-  "psycopg-pool>=3.2",
-  # `data/repositories.py` needs these two and nothing else from the `data` extra, so the
-  # serving image can skip geopandas/shapely/pyproj entirely — those are loader-only and
-  # are most of the install size.
-  "python-dotenv>=1.0",
-  "psycopg[binary]>=3.1",
 ]
 dev = [
   "formulas>=1.3",        # recomputes the xlsx export to check it against the engine
