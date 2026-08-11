@@ -26,5 +26,5 @@ services:
 
 databases:
   - name: residual-db
-    plan: basic-256mb      # the bake is ~293 MB today; size up before loading it
+    plan: basic-1gb        # the bake measures 293 MB today, so 256mb cannot hold it
     postgresMajorVersion: "16"

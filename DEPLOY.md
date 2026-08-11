@@ -110,5 +110,7 @@ runs the levered model live.
 - **Repo size.** Each committed tileset is ~33 MB and git keeps it forever. Delete the
   previous one in the same commit that adds the next, and if this gets tiresome move the
   tiles to object storage — `TILES_BASE_URL` already points anywhere.
-- **The database is the whole product.** 293 MB of baked results. Check the plan's storage
-  ceiling before restoring; free tiers sit between 256 MB and 1 GB and some expire.
+- **The database is the whole product.** 293 MB of baked results, measured rather than
+  estimated. That is why the blueprint asks for `basic-1gb` and not the 256 MB tier: the
+  restore would run out of disk partway through and leave a half-populated database, which
+  looks like a working deployment with most of DC missing.
