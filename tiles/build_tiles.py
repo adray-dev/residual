@@ -28,7 +28,7 @@ import sys
 import tempfile
 from bisect import bisect_right
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from data import repositories as repo
 
@@ -230,7 +230,12 @@ def run(out_dir: str = DEFAULT_OUT_DIR, database_url: str | None = None) -> Tile
             raise RuntimeError("No bake results. Run `python -m bake.run_bake` first.")
         report.computed_at = batch
 
-        stamp = batch.strftime("%Y%m%dT%H%M%S")
+        # UTC, always. `computed_at` is a timestamptz, so psycopg hands it back in the
+        # connection's timezone — America/Los_Angeles on this machine, GMT on the deployed
+        # database. Formatting it as-is names the same batch two different things, and the
+        # API then asks for a tileset that does not exist. Normalizing pins the name to the
+        # instant rather than to whoever is looking at it. Must match `api/routers/meta.py`.
+        stamp = batch.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S")
         dest = os.path.join(out_dir, f"parcels-{stamp}.pmtiles")
         print(f"[1/2] streaming features for batch {batch.isoformat()}...", flush=True)
 

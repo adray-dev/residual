@@ -9,7 +9,7 @@ client does afterwards is pinned to what it read here.
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
@@ -30,7 +30,12 @@ def tileset_for(batch: datetime) -> tuple[str | None, bool]:
     Returning None (rather than a stale file) is deliberate: better a map that says it has
     no tiles than one quietly drawn from the previous bake.
     """
-    stamp = batch.strftime("%Y%m%dT%H%M%S")
+    # UTC, always — `tiles/build_tiles.py` names the file the same way, and the two have to
+    # agree. `computed_at` is a timestamptz, so the rendering follows the connection's
+    # timezone: this machine reports America/Los_Angeles and the deployed database reports
+    # GMT, which named one batch both 20260809T150913 and 20260809T220913. The map then
+    # requested a tileset that was never built and drew nothing.
+    stamp = batch.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S")
     filename = f"parcels-{stamp}.pmtiles"
 
     # Served from another origin (the frontend's CDN). The batch stamp is still in the

@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
+    "web": {
+      "root": "web/",
+      "framework": "vite"
+    },
     "api": {
       "root": "./",
       "entrypoint": "api.main:app",
@@ -13,6 +17,29 @@
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": { "service": "api" } }
+    { "source": "/meta", "destination": { "service": "api" } },
+    { "source": "/health", "destination": { "service": "api" } },
+    { "source": "/openapi.json", "destination": { "service": "api" } },
+    { "source": "/docs", "destination": { "service": "api" } },
+    { "source": "/map/(.*)", "destination": { "service": "api" } },
+    { "source": "/parcel/(.*)", "destination": { "service": "api" } },
+    { "source": "/parcels/(.*)", "destination": { "service": "api" } },
+    { "source": "/assumptions", "destination": { "service": "api" } },
+    { "source": "/assumptions/(.*)", "destination": { "service": "api" } },
+    { "source": "/scenario/(.*)", "destination": { "service": "api" } },
+    { "source": "/scenarios", "destination": { "service": "api" } },
+    { "source": "/scenarios/(.*)", "destination": { "service": "api" } },
+    { "source": "/shortlists", "destination": { "service": "api" } },
+    { "source": "/shortlists/(.*)", "destination": { "service": "api" } },
+    { "source": "/export.xlsx", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ],
+  "headers": [
+    {
+      "source": "/tiles/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
   ]
 }
