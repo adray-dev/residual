@@ -8,7 +8,8 @@
 import { useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
-import { money, rate } from "../lib/format";
+import { rate } from "../lib/format";
+import { domainMoney, roundedDomain } from "../lib/rampDomain";
 import { LEGEND_GRADIENT, OBJECTIVE_METRIC, STATUS_COLORS } from "../lib/mapStyle";
 import styles from "./Legend.module.css";
 
@@ -24,10 +25,11 @@ const SEGMENT_COPY: Record<string, string> = {
   rlv_per_buildable_sf: "Per SF",
 };
 
-/** Per-SF figures are single-digit dollars — compacting them would erase the number. */
-function rampEnd(objective: string, value: number | null): string {
-  if (value == null) return "—";
-  return objective === "rlv_per_buildable_sf" ? `${rate(value, 0)}/SF` : money(value, 1);
+/** Per-SF figures are two- and three-digit dollars — compacting them would erase the
+ *  number, so only the total is abbreviated. Both arrive already rounded. */
+function rampEnd(objective: string, value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return objective === "rlv_per_buildable_sf" ? `${rate(value, 0)}/SF` : domainMoney(value);
 }
 
 export function Legend({
@@ -48,6 +50,10 @@ export function Legend({
   const [collapsed, setCollapsed] = useState(true);
 
   const ramp = meta.ramps[objective];
+  // Rounded outward, and by the same function the filter slider uses — the two print the
+  // same domain a few hundred pixels apart, so they have to agree. Note this rounds
+  // per-objective: the totals go to $10M, the per-SF figures to $10.
+  const domain = roundedDomain(ramp?.min, ramp?.max);
   const negative = ramp?.negative_count ?? 0;
   const positive = ramp?.positive_count ?? 0;
   const scored = negative + positive;
@@ -101,8 +107,8 @@ export function Legend({
           <span className={styles.zeroLabel}>$0</span>
         </div>
         <div className={styles.ends}>
-          <span>{rampEnd(objective, ramp?.min ?? null)}</span>
-          <span>{rampEnd(objective, ramp?.max ?? null)}</span>
+          <span>{rampEnd(objective, domain.floor)}</span>
+          <span>{rampEnd(objective, domain.ceiling)}</span>
         </div>
 
         {scored > 0 && (

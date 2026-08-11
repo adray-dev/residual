@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { NotModellable } from "../lib/api";
-import { money } from "../lib/format";
+import { domainMoney, roundedDomain } from "../lib/rampDomain";
 import { EMPTY_FILTERS, isEmpty, mapQuery, toggle, type FilterState } from "../lib/filters";
 import styles from "./Filters.module.css";
 
@@ -35,11 +35,6 @@ import styles from "./Filters.module.css";
  * previous batch has garden winners whose rows must render a name.
  */
 const BUILD_TYPES: string[][] = [["townhome"], ["5-over-1", "midrise"], ["highrise"]];
-
-/** The slider's own money: a decimal while dragging, where it distinguishes one position
- *  from the next, but no hanging ".0" at the ends, where the domain is whole tens of
- *  millions and "-$110.0M" only claims a precision the number does not have. */
-const sliderMoney = (value: number) => money(value, 1).replace(/\.0M$/, "M");
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -137,13 +132,11 @@ export function Filters({
   const [note, setNote] = useState<string | null>(null);
 
   // The value slider's domain comes from the current bake, read from /meta's ramp, then
-  // rounded outward to the next $10M so the track ends on a number rather than on wherever
-  // the extreme parcel happened to land. The bake's own -$103.7M and $336.3M read as
-  // precision the ends of a slider do not have; -$110M and $340M read as a range.
-  const RANGE_ROUNDING = 10_000_000;
+  // rounded outward so the track ends on a number rather than on wherever the extreme
+  // parcel happened to land. Shared with the legend, which prints the same two numbers a
+  // few hundred pixels away — see lib/rampDomain.
   const ramp = meta.ramps["rlv_total"];
-  const floor = Math.floor((ramp?.min ?? 0) / RANGE_ROUNDING) * RANGE_ROUNDING;
-  const ceiling = Math.ceil((ramp?.max ?? 0) / RANGE_ROUNDING) * RANGE_ROUNDING;
+  const { floor, ceiling } = roundedDomain(ramp?.min, ramp?.max);
   const step = Math.max(1, Math.round((ceiling - floor) / 200));
 
   useEffect(() => {
@@ -240,7 +233,7 @@ export function Filters({
                 set({ rlvMin: value <= floor ? null : value });
               }}
             />
-            <span className={styles.sliderValue}>{sliderMoney(state.rlvMin ?? floor)}</span>
+            <span className={styles.sliderValue}>{domainMoney(state.rlvMin ?? floor)}</span>
           </div>
           <div className={styles.sliderRow}>
             <span className={styles.sliderLabel}>Max</span>
@@ -257,7 +250,7 @@ export function Filters({
                 set({ rlvMax: value >= ceiling ? null : value });
               }}
             />
-            <span className={styles.sliderValue}>{sliderMoney(state.rlvMax ?? ceiling)}</span>
+            <span className={styles.sliderValue}>{domainMoney(state.rlvMax ?? ceiling)}</span>
           </div>
         </Group>
 
