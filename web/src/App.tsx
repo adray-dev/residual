@@ -43,6 +43,7 @@ import type { Ring } from "./lib/drawRing";
 import { Drilldown, NotModellablePanel } from "./components/Drilldown";
 import { Filters } from "./components/Filters";
 import { DrawControl } from "./components/DrawControl";
+import { Intro } from "./components/Intro";
 import { ResidualMark } from "./components/ResidualMark";
 import { Legend } from "./components/Legend";
 import { Loader } from "./components/Loader";
@@ -75,6 +76,9 @@ export function App() {
   // itself. The app underneath mounts and loads normally throughout — the loader covers the
   // wait rather than adding to it.
   const [booting, setBooting] = useState(true);
+  // The opening note follows the animation rather than overlapping it, so the two read as
+  // one sequence: the mark resolves, then the app says what it is.
+  const [introOpen, setIntroOpen] = useState(true);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [objective, setObjective] = useState("rlv_total");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -185,6 +189,7 @@ export function App() {
   const dismiss = useCallback(() => setSelection(null), []);
   // Stable, because the loader holds it in an effect that must not re-run mid-animation.
   const dismissLoader = useCallback(() => setBooting(false), []);
+  const dismissIntro = useCallback(() => setIntroOpen(false), []);
 
   const failed = useCallback((error: unknown, fromEdits: boolean): PanelState => {
     // A 422 is an answer about the parcel, not a fault — render the reason.
@@ -418,6 +423,7 @@ export function App() {
   return (
     <div className={styles.shell}>
       {booting && <Loader onDone={dismissLoader} />}
+      {!booting && introOpen && <Intro onDismiss={dismissIntro} />}
       <header className={styles.topbar}>
         <ResidualMark size={24} />
         <span className={styles.wordmark}>Residual</span>
