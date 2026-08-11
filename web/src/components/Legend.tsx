@@ -5,6 +5,7 @@
  * A legend showing only the ramp would leave 40% of DC's parcels colored by nothing the
  * reader can look up.
  */
+import { useState } from "react";
 import type { Meta } from "../lib/types";
 import type { Vocabulary } from "../lib/vocabulary";
 import { money, rate } from "../lib/format";
@@ -40,6 +41,12 @@ export function Legend({
   objective: string;
   onObjectiveChange: (objective: string) => void;
 }) {
+  // Only ever consulted at narrow widths: the toggle that sets it is display:none above the
+  // breakpoint, and the rule that acts on it lives inside the same media query. So a desktop
+  // renders the full panel no matter what this says, and a phone that was minimised and then
+  // widened does not end up with a legend it cannot open.
+  const [collapsed, setCollapsed] = useState(true);
+
   const ramp = meta.ramps[objective];
   const negative = ramp?.negative_count ?? 0;
   const positive = ramp?.positive_count ?? 0;
@@ -56,72 +63,87 @@ export function Legend({
   ];
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.segmented} role="tablist">
-        {meta.objectives.filter((key) => key !== "gap").map((key) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={key === objective}
-            title={vocab.metric(OBJECTIVE_METRIC[key] ?? key)}
-            className={`${styles.segment} ${key === objective ? styles.active : ""}`}
-            onClick={() => onObjectiveChange(key)}
-          >
-            {SEGMENT_COPY[key] ?? vocab.metric(OBJECTIVE_METRIC[key] ?? key)}
-          </button>
-        ))}
-      </div>
+    <div className={styles.panel} data-collapsed={collapsed || undefined}>
+      {/* Hidden above the breakpoint, where the legend costs nothing to leave open. The
+          gradient rides on the button so the control still says what it opens. */}
+      <button
+        type="button"
+        className={styles.toggle}
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((value) => !value)}
+      >
+        <span className={styles.toggleSwatch} style={{ background: LEGEND_GRADIENT }} />
+        <span className={styles.toggleLabel}>Legend</span>
+        <span className={styles.chevron} aria-hidden="true" />
+      </button>
 
-      <div className={styles.gradientWrap}>
-        <div className={styles.gradient} style={{ background: LEGEND_GRADIENT }} />
-        {/* $0 sits at the exact midpoint: the ramp is quantile-binned into four bins per
-            arm, so four of eight stops fall either side of zero by construction. */}
-        <span className={styles.zeroTick} aria-hidden="true" />
-        <span className={styles.zeroLabel}>$0</span>
-      </div>
-      <div className={styles.ends}>
-        <span>{rampEnd(objective, ramp?.min ?? null)}</span>
-        <span>{rampEnd(objective, ramp?.max ?? null)}</span>
-      </div>
-
-      {scored > 0 && (
-        <div className={styles.zero}>
-          <strong>{Math.round((positive / scored) * 100)}%</strong> of scored parcels are
-          positive.
+      <div className={styles.content}>
+        <div className={styles.segmented} role="tablist">
+          {meta.objectives.filter((key) => key !== "gap").map((key) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={key === objective}
+              title={vocab.metric(OBJECTIVE_METRIC[key] ?? key)}
+              className={`${styles.segment} ${key === objective ? styles.active : ""}`}
+              onClick={() => onObjectiveChange(key)}
+            >
+              {SEGMENT_COPY[key] ?? vocab.metric(OBJECTIVE_METRIC[key] ?? key)}
+            </button>
+          ))}
         </div>
-      )}
 
-      <div className={styles.rule} />
+        <div className={styles.gradientWrap}>
+          <div className={styles.gradient} style={{ background: LEGEND_GRADIENT }} />
+          {/* $0 sits at the exact midpoint: the ramp is quantile-binned into four bins per
+              arm, so four of eight stops fall either side of zero by construction. */}
+          <span className={styles.zeroTick} aria-hidden="true" />
+          <span className={styles.zeroLabel}>$0</span>
+        </div>
+        <div className={styles.ends}>
+          <span>{rampEnd(objective, ramp?.min ?? null)}</span>
+          <span>{rampEnd(objective, ramp?.max ?? null)}</span>
+        </div>
 
-      {/* Land the model cannot price. Neutral on the map and neutral here — these are
-          context for the value ramp, not competitors with it. */}
-      <div className={`micro-label ${styles.notPriced}`}>Not priced</div>
-      {statuses.map(([colorKey, statusKey]) => {
-        const count = meta.status_counts[statusKey];
-        if (!count) return null;
-        return (
-          <div className={styles.status} key={statusKey}>
-            <span
-              className={styles.swatch}
-              style={
-                statusKey === "exempt"
-                  ? {
-                      backgroundImage: `repeating-linear-gradient(45deg,${STATUS_COLORS.exempt} 0 3px,${STATUS_COLORS.exempt_alt} 3px 6px)`,
-                    }
-                  : statusKey === "zone_not_encoded"
-                    ? {
-                        background: STATUS_COLORS.zone_not_encoded,
-                        borderStyle: "dashed",
-                        borderColor: STATUS_COLORS.zone_not_encoded_border,
-                      }
-                    : { background: STATUS_COLORS[colorKey] }
-              }
-            />
-            {vocab.status(statusKey)}
-            <span className={styles.count}>{count.toLocaleString()}</span>
+        {scored > 0 && (
+          <div className={styles.zero}>
+            <strong>{Math.round((positive / scored) * 100)}%</strong> of scored parcels are
+            positive.
           </div>
-        );
-      })}
+        )}
+
+        <div className={styles.rule} />
+
+        {/* Land the model cannot price. Neutral on the map and neutral here — these are
+            context for the value ramp, not competitors with it. */}
+        <div className={`micro-label ${styles.notPriced}`}>Not priced</div>
+        {statuses.map(([colorKey, statusKey]) => {
+          const count = meta.status_counts[statusKey];
+          if (!count) return null;
+          return (
+            <div className={styles.status} key={statusKey}>
+              <span
+                className={styles.swatch}
+                style={
+                  statusKey === "exempt"
+                    ? {
+                        backgroundImage: `repeating-linear-gradient(45deg,${STATUS_COLORS.exempt} 0 3px,${STATUS_COLORS.exempt_alt} 3px 6px)`,
+                      }
+                    : statusKey === "zone_not_encoded"
+                      ? {
+                          background: STATUS_COLORS.zone_not_encoded,
+                          borderStyle: "dashed",
+                          borderColor: STATUS_COLORS.zone_not_encoded_border,
+                        }
+                      : { background: STATUS_COLORS[colorKey] }
+                }
+              />
+              {vocab.status(statusKey)}
+              <span className={styles.count}>{count.toLocaleString()}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

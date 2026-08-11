@@ -135,13 +135,74 @@
   color: var(--ink-25);
 }
 
+/* The minimise control. Hidden by default, which is what makes the whole mechanism
+   desktop-safe: above the breakpoint there is no way to set the collapsed state, and the
+   rule that acts on it is inside the media query below, so a wide screen always renders
+   the full panel regardless. */
+.toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+}
+
+.toggleSwatch {
+  width: 26px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.toggleLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+/* A chevron drawn from a rotated square, so it needs no icon font or asset. */
+.chevron {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink-40);
+  border-bottom: 1.5px solid var(--ink-40);
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.panel[data-collapsed] .chevron {
+  transform: translateY(1px) rotate(-135deg);
+}
+
 /* The map is a fixed slice of the screen at this width rather than the whole right-hand
-   side, so a 264px panel with desktop padding would cover most of what it describes. */
+   side, so a 264px panel with desktop padding would cover most of what it describes —
+   and minimised, it gets out of the way entirely. */
 @media (max-width: 820px) {
   .panel {
     top: 10px;
     right: 10px;
     width: min(232px, calc(100% - 20px));
     padding: 10px 11px;
+  }
+
+  .toggle {
+    display: flex;
+  }
+
+  /* Spacing belongs between the control and the panel, so it only exists when open. */
+  .content {
+    margin-top: 11px;
+  }
+
+  .panel[data-collapsed] {
+    width: auto;
+    padding: 8px 11px;
+  }
+
+  .panel[data-collapsed] .content {
+    display: none;
   }
 }
