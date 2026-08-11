@@ -45,6 +45,7 @@ import { Filters } from "./components/Filters";
 import { DrawControl } from "./components/DrawControl";
 import { ResidualMark } from "./components/ResidualMark";
 import { Legend } from "./components/Legend";
+import { Loader } from "./components/Loader";
 import { MapView } from "./components/MapView";
 import { Popup } from "./components/Popup";
 import { Compare, CompareTray } from "./components/Compare";
@@ -70,6 +71,10 @@ interface Selection {
 }
 
 export function App() {
+  // The boot animation plays once over the top of the app while it fetches, then dismisses
+  // itself. The app underneath mounts and loads normally throughout — the loader covers the
+  // wait rather than adding to it.
+  const [booting, setBooting] = useState(true);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [objective, setObjective] = useState("rlv_total");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -178,6 +183,8 @@ export function App() {
   }, []);
 
   const dismiss = useCallback(() => setSelection(null), []);
+  // Stable, because the loader holds it in an effect that must not re-run mid-animation.
+  const dismissLoader = useCallback(() => setBooting(false), []);
 
   const failed = useCallback((error: unknown, fromEdits: boolean): PanelState => {
     // A 422 is an answer about the parcel, not a fault — render the reason.
@@ -410,6 +417,7 @@ export function App() {
 
   return (
     <div className={styles.shell}>
+      {booting && <Loader onDone={dismissLoader} />}
       <header className={styles.topbar}>
         <ResidualMark size={24} />
         <span className={styles.wordmark}>Residual</span>
