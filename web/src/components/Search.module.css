@@ -97,7 +97,11 @@
   min-width: 0;
 }
 
+/* Both of these are spans, so they need an explicit box to stack. Left inline they ran
+   together on one line with nothing between them — "1200 19th St NWCentral" — and the
+   margin below could not apply, because margin-top does nothing to an inline element. */
 .resultName {
+  display: block;
   font-size: 13px;
   font-weight: 500;
   color: var(--ink);
@@ -108,9 +112,11 @@
 
 /* Quieter and smaller than the name, so the match reads first and this reads second. */
 .resultMeta {
+  display: block;
   font-size: 10.5px;
+  line-height: 1.35;
   color: var(--ink-25);
-  margin-top: 1px;
+  margin-top: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
