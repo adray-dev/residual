@@ -46,6 +46,11 @@ const LAYER = "parcels"; // the tippecanoe layer name, from tiles/build_tiles.py
 // The District's edge. Static reference data, so it ships in the bundle rather than the
 // tileset — see lib/dcBoundary.
 const BOUNDARY_SOURCE = "dc-boundary";
+// Its own grey rather than PARCEL_BORDER: that one is near-white, which is right for a
+// hairline separating two saturated fills and invisible for a line drawn on the #f4f2ed
+// canvas. Keyed to the same neutral family as the unscored statuses so the edge reads as
+// part of the map's furniture rather than as another value.
+const BOUNDARY_COLOR = "#8a8781";
 
 // The draw tool's own sources. Plain GeoJSON, rewritten with setData as the user clicks.
 const MASK_SOURCE = "draw-mask";
@@ -333,8 +338,8 @@ export function MapView({
           type: "line",
           source: BOUNDARY_SOURCE,
           paint: {
-            "line-color": PARCEL_BORDER,
-            "line-opacity": 0.5,
+            "line-color": BOUNDARY_COLOR,
+            "line-opacity": 0.75,
             // Thin enough at city zoom to frame rather than outline, and held there as the
             // map zooms in, where a boundary is context rather than the subject.
             "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 13, 1.4],
