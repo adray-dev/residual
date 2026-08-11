@@ -119,3 +119,50 @@
   border-radius: var(--r-pill);
   padding: 1px 7px;
 }
+
+/* --- narrow screens ------------------------------------------------------- */
+/* The desktop composition is three columns side by side, which needs width this does not
+   have. Below the breakpoint it becomes one scrolling stack — map first, because that is
+   the product, then the filters under it. Nothing here applies at desktop widths. */
+@media (max-width: 820px) {
+  .shell {
+    height: auto;
+    min-height: 100%;
+  }
+
+  /* Wraps to as many rows as it needs. The search field claims a whole row of its own —
+     see Search.module.css — so the buttons keep the first row to themselves. */
+  .topbar {
+    height: auto;
+    min-height: var(--topbar-h);
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+    position: sticky;
+    top: 0;
+  }
+
+  .main {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Ahead of the filter pane, which is second in the DOM because it is left-hand on a
+     desktop. Stacked, that order would open the app on a wall of controls. */
+  .mapArea {
+    order: -1;
+    flex: none;
+    /* `flex: 1` measures against a parent that no longer has a height to divide, so the
+       map would collapse to nothing. It takes an explicit share of the screen instead. */
+    height: 58vh;
+    min-height: 300px;
+  }
+
+  .panelState {
+    width: auto;
+    padding: 28px 20px;
+    border-left: 0;
+    border-top: 1px solid var(--hairline-strong);
+    box-shadow: none;
+  }
+}

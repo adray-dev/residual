@@ -136,3 +136,13 @@
   font-size: 12px;
   color: var(--ink-25);
 }
+
+/* A whole row to itself in the wrapped top bar — at this width it cannot share one with
+   the wordmark and two buttons without all four becoming unusable. */
+@media (max-width: 820px) {
+  .wrap {
+    order: 1;
+    flex: 1 0 100%;
+    max-width: none;
+  }
+}

@@ -12,6 +12,18 @@ body,
   height: 100%;
 }
 
+/* On a narrow screen the layout stops being a single full-height frame and becomes a
+   stack taller than the window, so the page itself has to be allowed to scroll. Pinning
+   these to 100% would clip everything below the first screenful. */
+@media (max-width: 820px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);

@@ -2,22 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- The layout width stays 1440 — the canvas this tool was drawn and tested at — because
-         its composition does not reflow, and a phone should get the real thing rather than an
-         untested one. What changes is only how much of it you see at once: `initial-scale=1`
-         opens at true size, legible and pannable, instead of fitting all 1440px into a 390px
-         screen, which was the "massive screen" problem — everything present, nothing readable.
-         `minimum-scale` still allows pinching back out to the whole layout.
-
-         Note this also fixes the layout viewport at 1440 on every device, so CSS media
-         queries always see 1440 and can never fire on a phone. Scale is the only lever here;
-         a breakpoint-based mobile layout would need this width released first.
-
-         Desktop browsers ignore this element entirely, so none of it reaches one. -->
-    <meta
-      name="viewport"
-      content="width=1440, initial-scale=1, minimum-scale=0.2, maximum-scale=5, user-scalable=yes"
-    />
+    <!-- The layout viewport is the device's own width. A pinned width (this was 1440) hands a
+         phone the desktop composition to pan around, which fails three ways at once: nothing
+         can be sized to a screen CSS cannot measure, every media query reports the pinned
+         width so no mobile rule can ever fire, and the map is a canvas rendered for 1440 that
+         the browser then rescales — which is what made it blurry. Releasing it lets the
+         breakpoints in App.module.css do the work, and lets MapLibre render at the device's
+         real pixel ratio. No maximum-scale, so pinch-zoom stays available. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Residual — Building on every block</title>
     <meta
       name="description"

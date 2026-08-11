@@ -313,3 +313,15 @@
   border-radius: var(--r-input);
   padding: 9px 11px;
 }
+
+/* Full width in the stack; the fixed rail widths are a desktop idea. */
+@media (max-width: 820px) {
+  .panel {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    border-left: 0;
+    border-top: 1px solid var(--hairline-strong);
+    box-shadow: none;
+  }
+}

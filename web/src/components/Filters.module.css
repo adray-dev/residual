@@ -286,3 +286,21 @@
   line-height: 1.45;
   color: var(--amber-text);
 }
+
+/* Stacked under the map rather than docked beside it: full width, natural height, and its
+   own scroll released so the page scrolls as one thing instead of trapping a column. */
+@media (max-width: 820px) {
+  .pane {
+    order: 1;
+    width: auto;
+    height: auto;
+    border-right: 0;
+    border-top: 1px solid var(--hairline-strong);
+  }
+
+  .body {
+    overflow-y: visible;
+    flex: none;
+    min-height: 0;
+  }
+}

@@ -42,6 +42,9 @@
   width: 560px;
   max-width: 100%;
   box-sizing: border-box;
+  /* Centres while the panel fits, and scrolls from the top edge once it does not — flex
+     centring alone would push the top of a tall panel out of reach. */
+  margin: auto;
   background: var(--surface);
   border-radius: var(--r-modal);
   box-shadow: var(--sh-modal);
