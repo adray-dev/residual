@@ -1,4 +1,9 @@
-/** The HTTP client. Every network call the app makes goes through here. */
+/** The HTTP client. Every network call the app makes goes through here.
+ *
+ * Every path is wrapped in `apiUrl` so a split deployment (static frontend on one host,
+ * API on another) works without touching call sites. Same-origin setups configure nothing
+ * and get the identical relative URLs they had before. */
+import { apiUrl } from "./config";
 import type {
   AssumptionSet,
   MapQuery,
@@ -46,7 +51,7 @@ async function failure(response: Response): Promise<string> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(apiUrl(path), {
       ...init,
       headers: { "content-type": "application/json", ...init?.headers },
     });
@@ -147,7 +152,7 @@ export function createShortlist(name: string): Promise<ShortlistSummary> {
 }
 
 async function noContent(path: string, method: string): Promise<void> {
-  const response = await fetch(path, { method });
+  const response = await fetch(apiUrl(path), { method });
   if (!response.ok) throw new ApiError(await failure(response), response.status);
 }
 
@@ -197,7 +202,7 @@ export function saveScenario(
 
 /** The saved scenario's JSON export URL. */
 export const scenarioExportUrl = (scenarioId: string) =>
-  `/scenario/${encodeURIComponent(scenarioId)}/export`;
+  apiUrl(`/scenario/${encodeURIComponent(scenarioId)}/export`);
 
 /** Download a live Excel workbook of the CURRENT inputs. No saved scenario needed.
  *
@@ -208,7 +213,7 @@ export async function exportWorkbook(
   parcelId: string,
   body: UnderwriteRequest,
 ): Promise<void> {
-  const response = await fetch("/export.xlsx", {
+  const response = await fetch(apiUrl("/export.xlsx"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...body, parcel_id: parcelId }),

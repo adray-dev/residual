@@ -1,0 +1,30 @@
+# Render blueprint: the API and its database. The frontend and the PMTiles go to Vercel.
+#
+# Why not all of it on Vercel: the map query is a PostGIS ST_Intersects over 132k
+# geometries behind a GiST index, and the bake writes 136k rows in one transaction. That
+# wants a real Postgres and a process that can hold a connection, not a function invocation.
+services:
+  - type: web
+    name: residual-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter          # free tier sleeps; the first request after idle pays a cold boot
+    healthCheckPath: /meta
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: residual-db
+          property: connectionString
+      # The Vercel origin, so the browser is allowed to call this host. Set it AFTER the
+      # first Vercel deploy tells you the domain; a wrong value here fails as a CORS error
+      # in the console, not as a server error in the logs.
+      - key: CORS_ORIGINS
+        sync: false
+      # Where /meta points the map for tiles — the Vercel origin plus /tiles.
+      - key: TILES_BASE_URL
+        sync: false
+
+databases:
+  - name: residual-db
+    plan: basic-256mb      # the bake is ~293 MB today; size up before loading it
+    postgresMajorVersion: "16"

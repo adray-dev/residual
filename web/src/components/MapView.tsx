@@ -16,6 +16,7 @@ import maplibregl, {
   type MapGeoJSONFeature,
 } from "maplibre-gl";
 import { PMTiles, Protocol } from "pmtiles";
+import { resolveApiHref } from "../lib/config";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   DRAW_ACCENT,
@@ -134,7 +135,10 @@ export function MapView({
   useEffect(() => {
     if (!container.current) return;
 
-    const url = new URL(tilesetUrl, window.location.origin).href;
+    // Resolved against the API base, not the page: /meta hands back a path like
+    // `/tiles/parcels-....pmtiles` which the API host serves, and on a split deployment
+    // that is a different origin from the one serving this bundle.
+    const url = new URL(resolveApiHref(tilesetUrl), window.location.origin).href;
     // Hand MapLibre the same PMTiles instance we read the header from, so the header and
     // directory fetches are shared rather than issued twice.
     const archive = new PMTiles(url);

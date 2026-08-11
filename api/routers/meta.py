@@ -32,6 +32,15 @@ def tileset_for(batch: datetime) -> tuple[str | None, bool]:
     """
     stamp = batch.strftime("%Y%m%dT%H%M%S")
     filename = f"parcels-{stamp}.pmtiles"
+
+    # Served from another origin (the frontend's CDN). The batch stamp is still in the
+    # filename, so the pairing guarantee holds: a tileset built from a different bake has a
+    # different name and simply 404s. What is lost is only the pre-flight existence check —
+    # the map surfaces the miss through its own error handler rather than /meta predicting
+    # it, which is the price of the file not being on this disk to stat.
+    if settings.tiles_base_url:
+        return f"{settings.tiles_base_url}/{filename}", True
+
     exists = os.path.isfile(os.path.join(settings.tiles_dir, filename))
     if not exists:
         return None, False

@@ -18,6 +18,12 @@ class Settings:
     tiles_url_prefix: str = field(
         default_factory=lambda: os.environ.get("TILES_URL_PREFIX", "/tiles")
     )
+    # Absolute base for the PMTiles when they are NOT served off this host's disk — a
+    # split deployment puts them on the CDN that serves the frontend, which is where a
+    # 33 MB file wants to be anyway (range requests, edge cache). Empty means local.
+    tiles_base_url: str = field(
+        default_factory=lambda: os.environ.get("TILES_BASE_URL", "").rstrip("/")
+    )
     cors_origins: list[str] = field(default_factory=_origins)
 
     # The IRR filter runs the full model per parcel (~20ms each), so it is bounded rather

@@ -3,9 +3,15 @@ __pycache__/
 *.pyc
 .env
 *.pmtiles
+# ...except the one the frontend ships. Vercel serves it as a static file, which is what a
+# 33 MB PMTiles archive wants: edge-cached, and range requests are how PMTiles reads it.
+# The batch stamp is in the filename, so replacing it on a re-bake is add-the-new,
+# delete-the-old rather than an overwrite.
+!web/public/tiles/*.pmtiles
 *.mbtiles
 node_modules/
 dist/
+.vite/
 *.egg-info/
 .claude/settings.local.json
 .DS_Store

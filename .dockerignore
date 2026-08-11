@@ -1,0 +1,11 @@
+.git
+.venv
+web
+node_modules
+__pycache__
+*.pyc
+.pytest_cache
+tiles/build
+design_handoff_parcel_feasibility_map
+*.zip
+.env
