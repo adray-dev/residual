@@ -1,18 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd web && npm install && npm run build",
-  "outputDirectory": "web/dist",
-  "framework": "vite",
-  "rewrites": [
-    { "source": "/((?!tiles/).*)", "destination": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/tiles/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
-      ]
+  "functions": {
+    "api/main.py": {
+      "maxDuration": 120,
+      "excludeFiles": "{web/**,tests/**,.venv/**,tiles/build/**,design_handoff_parcel_feasibility_map/**,data/loaders/**,**/*.pmtiles,**/*.mbtiles,**/*.zip,**/__pycache__/**}"
     }
-  ]
+  }
 }

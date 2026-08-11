@@ -41,6 +41,12 @@ dev = [
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+# Vercel would find `api/main.py` on its own — it is one of the filenames scanned — but
+# `engine/` and `data/` also sit at the root and naming the entrypoint outright removes
+# any question of which module gets loaded as the function.
+[tool.vercel]
+entrypoint = "api.main:app"
+
 [tool.setuptools]
 packages = ["engine", "data", "bake", "api", "tiles"]
 

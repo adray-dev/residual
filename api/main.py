@@ -42,9 +42,15 @@ async def lifespan(app: FastAPI):
     # A pool rather than a connection per request: the underwrite path is CPU-bound and
     # FastAPI runs sync endpoints in a threadpool, so several requests really are in
     # flight at once.
+    #
+    # Both sizes are environment-tunable because a serverless deployment wants the
+    # opposite of a long-lived server. There, many instances each hold their own pool
+    # against one database, so a floor of 1 per instance idles connections open for no
+    # reason — DB_POOL_MIN=0 lets the pool empty between requests and reconnect on demand,
+    # which also stops a cold start from blocking on a database that has scaled to zero.
     app.state.pool = ConnectionPool(
         conninfo=database_url(),
-        min_size=1,
+        min_size=int(os.environ.get("DB_POOL_MIN", "1")),
         max_size=int(os.environ.get("DB_POOL_MAX", "10")),
         kwargs={"row_factory": dict_row},
         open=True,
