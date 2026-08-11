@@ -35,12 +35,17 @@ import {
   type Position,
   type Ring,
 } from "../lib/drawRing";
+import { DC_BOUNDARY } from "../lib/dcBoundary";
 
 const SCORED: FilterSpecification = ["==", ["get", "status"], "scored"];
 const HATCH = "exempt-hatch";
 
 const SOURCE = "parcels";
 const LAYER = "parcels"; // the tippecanoe layer name, from tiles/build_tiles.py
+
+// The District's edge. Static reference data, so it ships in the bundle rather than the
+// tileset — see lib/dcBoundary.
+const BOUNDARY_SOURCE = "dc-boundary";
 
 // The draw tool's own sources. Plain GeoJSON, rewritten with setData as the user clicks.
 const MASK_SOURCE = "draw-mask";
@@ -317,6 +322,26 @@ export function MapView({
           },
         });
       }
+
+      // The District's edge, so the map reads as a place with a shape rather than parcels
+      // that happen to stop. Above the fills, so the line is unbroken where parcels meet
+      // it; below hover and selection, so it never competes with what is being pointed at.
+      instance.addSource(BOUNDARY_SOURCE, { type: "geojson", data: DC_BOUNDARY });
+      instance.addLayer(
+        {
+          id: "dc-boundary",
+          type: "line",
+          source: BOUNDARY_SOURCE,
+          paint: {
+            "line-color": PARCEL_BORDER,
+            "line-opacity": 0.5,
+            // Thin enough at city zoom to frame rather than outline, and held there as the
+            // map zooms in, where a boundary is context rather than the subject.
+            "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 13, 1.4],
+          },
+        },
+        "parcels-hover",
+      );
 
       // --- the draw-an-area tool ------------------------------------------
       for (const id of [MASK_SOURCE, AREA_SOURCE, SKETCH_SOURCE]) {

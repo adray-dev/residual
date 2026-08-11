@@ -325,7 +325,8 @@ export function Table({
         </div>
 
         {error && <div className={styles.banner} role="alert">{error}</div>}
-        {busy && !data && <div className={styles.state}>Reading the bake…</div>}
+        {/* No text on first load. The wait is short and the table is about to appear where
+            the message would be, so naming the wait only puts a word in the way of it. */}
         {!error && data?.rows.length === 0 && (
           <div className={styles.state}>No parcels match these filters.</div>
         )}
