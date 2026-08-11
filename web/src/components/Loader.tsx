@@ -10,6 +10,7 @@
  * defaults to. The other three live in the source zip if this is ever reconsidered.
  */
 import { useEffect, useRef, useState } from "react";
+import { useVisualViewport } from "../lib/visualViewport";
 
 /** px per grid unit — the mark is drawn on a 100-unit grid. */
 const S = 2.6;
@@ -97,6 +98,12 @@ export function Loader({ onDone }: { onDone: () => void }) {
   const [T, setT] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const done = useRef(false);
+  // Pinned to the visible window rather than the 1440 layout — see lib/visualViewport.
+  const view = useVisualViewport();
+  // The mark is 260px across and the wordmark a little under 200px. On anything narrower
+  // than a phone held upright that would overflow, so the whole composition scales as one
+  // rather than letting the mark clip.
+  const fit = Math.min(1, (view.width - 48) / 300);
 
   useEffect(() => {
     const finish = () => {
@@ -142,7 +149,10 @@ export function Loader({ onDone }: { onDone: () => void }) {
       aria-hidden
       style={{
         position: "fixed",
-        inset: 0,
+        left: view.left,
+        top: view.top,
+        width: view.width,
+        height: view.height,
         zIndex: 1000,
         background: BG,
         display: "flex",
@@ -153,7 +163,14 @@ export function Loader({ onDone }: { onDone: () => void }) {
         pointerEvents: leaving ? "none" : "auto",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          transform: fit < 1 ? `scale(${fit})` : undefined,
+        }}
+      >
         <div style={{ position: "relative", width: 100 * S, height: 100 * S }}>
           {RECTS.map((r) => {
             const { transform, opacity, glow } = split(r, T);

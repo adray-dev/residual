@@ -1,14 +1,18 @@
 /* The scrim matches InputsModal's so the two read as the same surface, but centred rather
    than top-aligned — this one is short and has no relationship to the map behind it. */
+/* Deliberately no `inset: 0`: the position and size are set from `window.visualViewport`
+   in the component, because the layout viewport is pinned to 1440 and `inset: 0` would
+   centre this around x=720 — off-screen on a phone. On desktop the two agree exactly. */
 .scrim {
   position: fixed;
-  inset: 0;
   z-index: 900;
   background: rgba(26, 29, 28, 0.42);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
   animation: fade-in 320ms ease-out both;
 }
 
@@ -37,11 +41,36 @@
 .card {
   width: 560px;
   max-width: 100%;
+  box-sizing: border-box;
   background: var(--surface);
   border-radius: var(--r-modal);
   box-shadow: var(--sh-modal);
   padding: 40px 44px 32px;
   font-family: var(--font-sans);
+}
+
+/* Applied when the visible window is narrower than the panel. Type comes down with the
+   padding — shrinking only the box would leave desktop-scale text in a phone-scale panel,
+   which is the same "too big to read" in a smaller frame. */
+.card.compact {
+  padding: 26px 24px 20px;
+  border-radius: var(--r-panel);
+}
+
+.compact .lead {
+  font-size: 21px;
+  margin-bottom: 12px;
+}
+
+.compact .body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.compact .hint {
+  margin-top: 18px;
+  padding-top: 12px;
+  font-size: 11px;
 }
 
 .lead {

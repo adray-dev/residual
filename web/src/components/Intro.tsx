@@ -6,13 +6,20 @@
  * the intended cost: one gesture, any gesture.
  */
 import { useEffect, useRef, useState } from "react";
+import { useVisualViewport } from "../lib/visualViewport";
 import styles from "./Intro.module.css";
 
 const FADE_MS = 180;
 
+/** Below this the panel is wider than the window, so it drops to the compact scale. */
+const COMPACT_BELOW = 560;
+
 export function Intro({ onDismiss }: { onDismiss: () => void }) {
   const [leaving, setLeaving] = useState(false);
   const done = useRef(false);
+  // Pinned to what the user can see, not to the 1440 layout — see lib/visualViewport.
+  const view = useVisualViewport();
+  const compact = view.width < COMPACT_BELOW;
 
   useEffect(() => {
     const dismiss = () => {
@@ -40,11 +47,18 @@ export function Intro({ onDismiss }: { onDismiss: () => void }) {
     <div
       className={styles.scrim}
       data-leaving={leaving || undefined}
+      style={{
+        left: view.left,
+        top: view.top,
+        width: view.width,
+        height: view.height,
+        padding: compact ? 16 : 20,
+      }}
       role="dialog"
       aria-modal="true"
       aria-label="About Residual"
     >
-      <div className={styles.card}>
+      <div className={`${styles.card} ${compact ? styles.compact : ""}`}>
         <h2 className={styles.lead}>Find out what pencils.</h2>
         <p className={styles.body}>
           Residual evaluates every parcel within a given geography to identify its most
